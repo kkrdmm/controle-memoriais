@@ -104,9 +104,11 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .overlay.is-open { display: flex; }
 
 .drawer { width: 420px; max-width: calc(100% - 32px); max-height: calc(100% - 32px); background: var(--surface); padding: 28px 26px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 12px 32px rgba(0,0,0,0.14); border-radius: var(--radius); }
-.overlay#overlay { justify-content: flex-end; align-items: stretch; }
-.overlay#overlay .drawer { height: 100%; max-height: 100%; border-radius: 0; transform: translateX(100%); transition: transform 0.22s ease; }
-.overlay#overlay.is-open .drawer { transform: translateX(0); }
+
+/* Tela de edição do memorial: ocupa a página inteira, não é gaveta lateral */
+.overlay#overlay { justify-content: center; align-items: stretch; background: var(--bg); }
+.overlay#overlay .drawer { width: 100%; max-width: 760px; height: 100%; max-height: 100%; margin: 0 auto; border-radius: 0; box-shadow: none; padding: 40px clamp(20px, 5vw, 40px); opacity: 0; transition: opacity 0.15s ease; }
+.overlay#overlay.is-open .drawer { opacity: 1; }
 
 .drawer-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
 .drawer-head h2 { font-family: var(--serif); font-weight: 500; font-size: 22px; margin: 0; }
@@ -127,6 +129,15 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .field-checkbox { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--ink); flex-direction: row !important; }
 .field-checkbox input { width: auto; accent-color: var(--accent); }
 .entrega-empty { font-size: 13px; color: var(--ink-faint); margin-top: 8px; }
+
+.copy-field { display: flex; gap: 6px; align-items: center; }
+.copy-field input { flex: 1; }
+.btn-copy { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 10px; font-family: var(--sans); font-size: 12px; color: var(--ink-soft); cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+.btn-copy:hover { background: var(--surface-alt); color: var(--ink); }
+.btn-copy.is-copied { color: var(--green); border-color: var(--green); }
+
+.senha-row { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; background: var(--surface-alt); display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.senha-row-head { font-size: 13px; color: var(--ink-soft); font-weight: 500; display: flex; justify-content: space-between; align-items: center; }
 .field-row { display: flex; gap: 12px; }
 
 .drawer-actions { margin-top: auto; padding-top: 16px; display: flex; justify-content: space-between; align-items: center; }
@@ -294,6 +305,17 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
         <input type="number" id="field-qtd-laudas" placeholder="0" step="1" min="0">
       </label>
     </div>
+
+    <div class="field" style="flex-direction:row;align-items:center;gap:10px;">
+      <button class="toggle" id="field-contratou-lattes" type="button"></button>
+      <span>Contratou a atualização do Lattes junto com o memorial</span>
+    </div>
+
+    <div class="field-group-title">Senhas fornecidas pelo cliente</div>
+    <p class="field-hint">Fica salvo junto com os dados deste memorial. Use o backup e sincronização para não perder.</p>
+    <div id="senhas-fixas"></div>
+    <div id="senhas-outras"></div>
+    <button type="button" class="btn-secondary" id="btn-add-senha" style="align-self:flex-start;">+ Adicionar outra senha</button>
 
     <div class="field-group-title">Entregas combinadas</div>
     <label class="field"><span>Quantas entregas estão previstas?</span>
@@ -472,7 +494,7 @@ function renderLista(visible) {
       entregasHtml = `<span class="entry-deadline ${cls}">${texto}</span>`;
     }
     li.innerHTML = `
-      <h3 class="entry-title">${escapeHtml(m.titulo)}</h3>
+      <h3 class="entry-title">${escapeHtml(m.titulo)}${m.contratouLattes ? ` <span class="tag tag-andamento" style="font-size:10.5px;vertical-align:middle;">+ Lattes</span>` : ""}</h3>
       <div class="entry-client">${escapeHtml(clienteLinha || "Sem instituição definida")}</div>
       <div class="entry-meta">
         <span class="tag tag-${status}">${tagLabel}</span>
@@ -562,6 +584,7 @@ function toggleLaudaWrap() {
 document.getElementById("field-categoria").addEventListener("change", toggleCategoriaOutro);
 document.getElementById("field-instituicao").addEventListener("change", toggleInstituicaoOutro);
 document.getElementById("field-cobra-lauda").addEventListener("click", (e) => { e.target.classList.toggle("on"); toggleLaudaWrap(); });
+document.getElementById("field-contratou-lattes").addEventListener("click", (e) => e.target.classList.toggle("on"));
 
 function syncPrevEntregueDisplay() {
   document.getElementById("field-prev-entregue-display").value = document.getElementById("field-prazo").value;
@@ -636,10 +659,135 @@ document.getElementById("field-qtd-entregas").addEventListener("input", (e) => {
   renderEntregasFields(qtd);
 });
 
+/* --- Senhas fornecidas pelo cliente --- */
+const SISTEMAS_FIXOS = [
+  { key: "lattes", label: "Lattes" },
+  { key: "usp", label: "Sistemas USP" },
+  { key: "sage", label: "SAGE" },
+];
+
+async function copiarTexto(valor, btn) {
+  if (!valor) return;
+  try {
+    await navigator.clipboard.writeText(valor);
+  } catch (e) {
+    const ta = document.createElement("textarea");
+    ta.value = valor;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); } catch (e2) {}
+    document.body.removeChild(ta);
+  }
+  if (btn) {
+    const original = btn.textContent;
+    btn.textContent = "Copiado!";
+    btn.classList.add("is-copied");
+    setTimeout(() => { btn.textContent = original; btn.classList.remove("is-copied"); }, 1500);
+  }
+}
+
+function senhaCamposHtml(loginId, senhaId, loginVal, senhaVal) {
+  return `
+    <div class="field-row">
+      <label class="field"><span>Login</span>
+        <div class="copy-field">
+          <input type="text" id="${loginId}" value="${escapeHtml(loginVal || "")}" placeholder="usuário ou e-mail">
+          <button type="button" class="btn-copy" data-copy-target="${loginId}">Copiar</button>
+        </div>
+      </label>
+      <label class="field"><span>Senha</span>
+        <div class="copy-field">
+          <input type="text" id="${senhaId}" value="${escapeHtml(senhaVal || "")}" placeholder="senha">
+          <button type="button" class="btn-copy" data-copy-target="${senhaId}">Copiar</button>
+        </div>
+      </label>
+    </div>`;
+}
+
+function renderSenhasFixas(senhas) {
+  const wrap = document.getElementById("senhas-fixas");
+  const s = senhas || {};
+  wrap.innerHTML = SISTEMAS_FIXOS.map((sis) => {
+    const dados = s[sis.key] || {};
+    return `
+      <div class="senha-row">
+        <div class="senha-row-head">${sis.label}</div>
+        ${senhaCamposHtml(`field-senha-${sis.key}-login`, `field-senha-${sis.key}-senha`, dados.login, dados.senha)}
+      </div>`;
+  }).join("");
+  wireCopyButtons(wrap);
+}
+
+function renderSenhasOutras(outras) {
+  const wrap = document.getElementById("senhas-outras");
+  wrap.innerHTML = "";
+  (outras || []).forEach((s, i) => {
+    const row = document.createElement("div");
+    row.className = "senha-row";
+    const loginId = `field-senha-outra-${i}-login`;
+    const senhaId = `field-senha-outra-${i}-senha`;
+    row.innerHTML = `
+      <div class="senha-row-head">
+        <input type="text" class="senha-outra-sistema" placeholder="Nome do sistema" value="${escapeHtml(s.sistema || "")}" style="border:none;background:none;font-family:var(--sans);font-size:13px;font-weight:500;color:var(--ink-soft);padding:0;width:auto;flex:1;">
+        <button type="button" class="entrega-remove" data-index="${i}">Remover</button>
+      </div>
+      ${senhaCamposHtml(loginId, senhaId, s.login, s.senha)}`;
+    wrap.appendChild(row);
+  });
+  wireCopyButtons(wrap);
+  wrap.querySelectorAll(".entrega-remove").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const idx = Number(btn.dataset.index);
+      const restantes = coletarSenhasOutrasDoForm().filter((_, i) => i !== idx);
+      renderSenhasOutras(restantes);
+    });
+  });
+}
+
+function wireCopyButtons(scope) {
+  scope.querySelectorAll(".btn-copy").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const input = document.getElementById(btn.dataset.copyTarget);
+      copiarTexto(input ? input.value : "", btn);
+    });
+  });
+}
+
+function coletarSenhasFixasDoForm() {
+  const out = {};
+  SISTEMAS_FIXOS.forEach((sis) => {
+    const login = document.getElementById(`field-senha-${sis.key}-login`);
+    const senha = document.getElementById(`field-senha-${sis.key}-senha`);
+    if (login && senha && (login.value.trim() || senha.value.trim())) {
+      out[sis.key] = { login: login.value.trim(), senha: senha.value.trim() };
+    }
+  });
+  return out;
+}
+function coletarSenhasOutrasDoForm() {
+  const rows = document.querySelectorAll("#senhas-outras .senha-row");
+  const out = [];
+  rows.forEach((row) => {
+    const sistema = row.querySelector(".senha-outra-sistema").value.trim();
+    const login = row.querySelector("input[id^='field-senha-outra-'][id$='-login']").value.trim();
+    const senha = row.querySelector("input[id^='field-senha-outra-'][id$='-senha']").value.trim();
+    if (sistema || login || senha) out.push({ sistema, login, senha });
+  });
+  return out;
+}
+document.getElementById("btn-add-senha").addEventListener("click", () => {
+  const atuais = coletarSenhasOutrasDoForm();
+  atuais.push({ sistema: "", login: "", senha: "" });
+  renderSenhasOutras(atuais);
+});
+
 function openNew(etapaInicial) {
   formEl.reset();
   document.getElementById("field-id").value = "";
   document.getElementById("field-cobra-lauda").classList.remove("on");
+  document.getElementById("field-contratou-lattes").classList.remove("on");
   document.getElementById("field-etapa").value = etapaInicial || "Levantamento de dados";
   toggleCategoriaOutro();
   toggleInstituicaoOutro();
@@ -648,6 +796,8 @@ function openNew(etapaInicial) {
   syncPrevEntregueDisplay();
   document.getElementById("field-qtd-entregas").value = "";
   renderEntregasFields(0);
+  renderSenhasFixas(null);
+  renderSenhasOutras([]);
   drawerTitleEl.textContent = etapaInicial === "Prospecção" ? "Novo cliente futuro" : "Novo memorial";
   btnDeleteEl.style.display = "none";
   overlayEl.classList.add("is-open");
@@ -672,6 +822,7 @@ function openEdit(id) {
   document.getElementById("field-cobra-lauda").classList.toggle("on", !!m.cobraLauda);
   document.getElementById("field-valor-lauda").value = m.valorLauda || "";
   document.getElementById("field-qtd-laudas").value = m.qtdLaudas || "";
+  document.getElementById("field-contratou-lattes").classList.toggle("on", !!m.contratouLattes);
   document.getElementById("field-obs").value = m.obs || "";
   toggleCategoriaOutro();
   toggleInstituicaoOutro();
@@ -681,6 +832,8 @@ function openEdit(id) {
   const entregas = m.entregas || [];
   document.getElementById("field-qtd-entregas").value = entregas.length || "";
   renderEntregasFields(entregas.length, entregas);
+  renderSenhasFixas(m.senhas);
+  renderSenhasOutras((m.senhas && m.senhas.outras) || []);
   drawerTitleEl.textContent = "Editar memorial";
   btnDeleteEl.style.display = "";
   overlayEl.classList.add("is-open");
@@ -711,6 +864,8 @@ formEl.addEventListener("submit", async (e) => {
     valorLauda: cobraLauda ? document.getElementById("field-valor-lauda").value : "",
     qtdLaudas: cobraLauda ? document.getElementById("field-qtd-laudas").value : "",
     entregas: coletarEntregasDoForm(),
+    contratouLattes: document.getElementById("field-contratou-lattes").classList.contains("on"),
+    senhas: { ...coletarSenhasFixasDoForm(), outras: coletarSenhasOutrasDoForm() },
     obs: document.getElementById("field-obs").value.trim(),
   };
   if (id) { Object.assign(memoriais.find((x) => x.id === id), data); }
