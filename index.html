@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Memoriais — andamento dos trabalhos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #E7E2D4;
+  --surface: #FBF9F3;
+  --surface-alt: #F0EBDC;
+  --ink: #221F19;
+  --ink-soft: #5B5546;
+  --ink-faint: #8A8371;
+  --line: #CCC3AB;
+  --accent: #7A2E2E;
+  --accent-soft: #E7D2C9;
+  --sage: #57634A;
+  --sage-soft: #DEE3D2;
+  --amber: #93611E;
+  --amber-soft: #EDDCB9;
+  --danger: #A23A2A;
+  --danger-soft: #F0D6CC;
+  --green: #3E6B4A;
+  --radius: 3px;
+  --serif: "Fraunces", Georgia, serif;
+  --sans: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+.page { max-width: 760px; margin: 0 auto; padding: 56px 24px 96px; }
+
+.masthead { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid var(--ink); padding-bottom: 20px; margin-bottom: 10px; }
+.masthead h1 { font-family: var(--serif); font-weight: 600; font-size: 42px; letter-spacing: -0.01em; margin: 0; line-height: 1; }
+.subtitle { margin: 8px 0 0; color: var(--ink-soft); font-size: 14.5px; }
+.masthead-actions { display: flex; gap: 8px; align-items: center; }
+
+.flash { background: var(--sage-soft); color: var(--sage); border-radius: var(--radius); padding: 9px 14px; font-size: 13.5px; margin: 14px 0; display: none; }
+.flash.is-visible { display: block; }
+
+.btn-primary { background: var(--accent); color: var(--surface); border: none; border-radius: var(--radius); padding: 11px 18px; font-family: var(--sans); font-size: 14.5px; font-weight: 500; cursor: pointer; white-space: nowrap; transition: background 0.15s ease; }
+.btn-primary:hover { background: #632424; }
+.btn-secondary { background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 16px; font-family: var(--sans); font-size: 13.5px; cursor: pointer; }
+.btn-secondary:hover { background: var(--surface-alt); }
+
+.filters { display: flex; gap: 4px; margin: 22px 0; }
+.filter-tab { background: none; border: none; border-radius: var(--radius); padding: 7px 13px; font-family: var(--sans); font-size: 13.5px; color: var(--ink-soft); cursor: pointer; }
+.filter-tab:hover { background: var(--surface-alt); }
+.filter-tab.is-active { background: var(--ink); color: var(--surface); }
+
+.ledger { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.entry { border-bottom: 1px solid var(--line); background: var(--surface); padding: 16px 18px; cursor: pointer; display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; align-items: start; transition: background 0.12s ease; }
+.entry:hover { background: var(--surface-alt); }
+.entry-title { font-family: var(--serif); font-size: 18px; font-weight: 500; margin: 0; grid-column: 1; }
+.entry-client { font-size: 13px; color: var(--ink-faint); grid-column: 1; }
+.entry-meta { grid-column: 2; grid-row: 1 / span 2; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; text-align: right; }
+
+.tag { font-size: 12px; font-weight: 500; padding: 3px 9px; border-radius: 12px; white-space: nowrap; }
+.tag-andamento { background: var(--sage-soft); color: var(--sage); }
+.tag-entregue { background: var(--accent-soft); color: var(--accent); }
+.tag-atrasado { background: var(--danger-soft); color: var(--danger); }
+
+.entry-deadline { font-size: 12.5px; color: var(--ink-faint); }
+.entry-deadline.is-urgent { color: var(--amber); }
+.entry-deadline.is-late { color: var(--danger); }
+.entry-value { font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+
+.empty-state { display: none; text-align: center; padding: 64px 20px; color: var(--ink-faint); }
+.empty-state p { margin: 0 0 4px; }
+.empty-state.is-visible { display: block; }
+.empty-sub { font-size: 13.5px; }
+
+.page-footer { display: flex; gap: 18px; margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--line); }
+.btn-ghost { background: none; border: none; color: var(--ink-soft); font-family: var(--sans); font-size: 13px; cursor: pointer; padding: 4px 0; text-decoration: underline; text-underline-offset: 3px; }
+.btn-ghost:hover { color: var(--ink); }
+
+.overlay { position: fixed; inset: 0; background: rgba(34, 31, 25, 0.35); display: none; align-items: center; justify-content: center; z-index: 10; }
+.overlay.is-open { display: flex; }
+
+.drawer { width: 420px; max-width: calc(100% - 32px); max-height: calc(100% - 32px); background: var(--surface); padding: 28px 26px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 12px 32px rgba(0,0,0,0.14); border-radius: var(--radius); }
+.overlay#overlay { justify-content: flex-end; align-items: stretch; }
+.overlay#overlay .drawer { height: 100%; max-height: 100%; border-radius: 0; transform: translateX(100%); transition: transform 0.22s ease; }
+.overlay#overlay.is-open .drawer { transform: translateX(0); }
+
+.drawer-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.drawer-head h2 { font-family: var(--serif); font-weight: 500; font-size: 22px; margin: 0; }
+.btn-icon { background: none; border: none; font-size: 16px; color: var(--ink-soft); cursor: pointer; padding: 4px; }
+.btn-icon:hover { color: var(--ink); }
+
+.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--ink-soft); flex: 1; }
+.field input, .field select, .field textarea { font-family: var(--sans); font-size: 14.5px; color: var(--ink); background: var(--surface-alt); border: 1px solid var(--line); border-radius: var(--radius); padding: 9px 10px; outline: none; width: 100%; }
+.field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
+.field-hint { font-size: 12.5px; color: var(--ink-faint); margin: -6px 0 4px; }
+.field-row { display: flex; gap: 12px; }
+
+.drawer-actions { margin-top: auto; padding-top: 16px; display: flex; justify-content: space-between; align-items: center; }
+.btn-text { background: none; border: none; color: var(--danger); font-family: var(--sans); font-size: 13.5px; cursor: pointer; }
+.btn-text:hover { text-decoration: underline; }
+
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+.tab { background: none; border: none; padding: 9px 4px; margin-right: 14px; font-family: var(--sans); font-size: 13.5px; color: var(--ink-faint); cursor: pointer; border-bottom: 2px solid transparent; }
+.tab.is-active { color: var(--ink); border-bottom-color: var(--accent); }
+
+.toggle { width: 34px; height: 20px; border-radius: 10px; background: var(--line); border: none; position: relative; cursor: pointer; flex-shrink: 0; }
+.toggle::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--surface); transition: left 0.15s ease; }
+.toggle.on { background: var(--sage); }
+.toggle.on::after { left: 16px; }
+
+.field-status { font-size: 12.5px; min-height: 16px; }
+.status-ok { color: var(--green); }
+.status-err { color: var(--danger); }
+.status-pending { color: var(--ink-faint); }
+
+@media (max-width: 560px) {
+  .page { padding: 32px 16px 72px; }
+  .masthead { flex-direction: column; align-items: flex-start; gap: 14px; }
+  .masthead h1 { font-size: 32px; }
+  .entry { grid-template-columns: 1fr; }
+  .entry-meta { grid-row: auto; align-items: flex-start; text-align: left; flex-direction: row; flex-wrap: wrap; margin-top: 6px; }
+}
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <header class="masthead">
+    <div class="masthead-title">
+      <h1>Memoriais</h1>
+      <p class="subtitle" id="subtitle">carregando…</p>
+    </div>
+    <div class="masthead-actions">
+      <button class="btn-primary" id="btn-new">Novo memorial</button>
+    </div>
+  </header>
+
+  <div class="flash" id="flash"></div>
+
+  <nav class="filters" id="filters">
+    <button class="filter-tab is-active" data-filter="todos">Todos</button>
+    <button class="filter-tab" data-filter="andamento">Em andamento</button>
+    <button class="filter-tab" data-filter="entregue">Entregues</button>
+    <button class="filter-tab" data-filter="atrasado">Atrasados</button>
+  </nav>
+
+  <main>
+    <ul class="ledger" id="ledger"></ul>
+    <div class="empty-state" id="empty-state">
+      <p>Nenhum memorial por aqui ainda.</p>
+      <p class="empty-sub">Cadastre o primeiro para começar a acompanhar o andamento.</p>
+    </div>
+  </main>
+
+  <footer class="page-footer">
+    <button class="btn-ghost" id="btn-sync">Backup e sincronização</button>
+    <button class="btn-ghost" id="btn-export">Exportar dados (.json)</button>
+    <label class="btn-ghost" for="import-file">Importar dados</label>
+    <input type="file" id="import-file" accept="application/json" hidden>
+  </footer>
+
+</div>
+
+<!-- Painel: novo / editar memorial -->
+<div class="overlay" id="overlay">
+  <form class="drawer" id="form">
+    <div class="drawer-head">
+      <h2 id="drawer-title">Novo memorial</h2>
+      <button type="button" class="btn-icon" id="btn-close" aria-label="Fechar">✕</button>
+    </div>
+    <input type="hidden" id="field-id">
+    <label class="field"><span>Título do memorial</span>
+      <input type="text" id="field-titulo" placeholder="Ex.: Memorial de progressão — Profa. Ana Lima" required>
+    </label>
+    <label class="field"><span>Cliente</span>
+      <input type="text" id="field-cliente" placeholder="Nome de quem encomendou">
+    </label>
+    <div class="field-row">
+      <label class="field"><span>Etapa atual</span>
+        <select id="field-etapa">
+          <option>Levantamento de dados</option>
+          <option>Rascunho</option>
+          <option>Revisão</option>
+          <option>Diagramação</option>
+          <option>Entregue</option>
+        </select>
+      </label>
+      <label class="field"><span>Valor (R$)</span>
+        <input type="number" id="field-valor" placeholder="0,00" step="0.01" min="0">
+      </label>
+    </div>
+    <div class="field-row">
+      <label class="field"><span>Início</span><input type="date" id="field-inicio"></label>
+      <label class="field"><span>Prazo</span><input type="date" id="field-prazo"></label>
+    </div>
+    <label class="field"><span>Observações</span>
+      <textarea id="field-obs" rows="4" placeholder="Anotações sobre o andamento, pendências, contato do cliente..."></textarea>
+    </label>
+    <div class="drawer-actions">
+      <button type="button" class="btn-text" id="btn-delete">Excluir</button>
+      <button type="submit" class="btn-primary">Salvar</button>
+    </div>
+  </form>
+</div>
+
+<!-- Painel: backup e sincronização -->
+<div class="overlay" id="overlay-sync">
+  <div class="drawer" style="width:460px;">
+    <div class="drawer-head">
+      <h2>Backup e sincronização</h2>
+      <button type="button" class="btn-icon" id="btn-close-sync" aria-label="Fechar">✕</button>
+    </div>
+    <div class="tabs">
+      <button class="tab is-active" data-tab="github">GitHub</button>
+      <button class="tab" data-tab="local">Arquivo local</button>
+    </div>
+    <div id="sync-content"></div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = "memoriais-tracker:v1";
+const SYNC_KEY = "memoriais-tracker:sync-config";
+const GIST_FILENAME = "memoriais-backup.json";
+
+let memoriais = [];
+let atualizadoEm = null;
+let currentFilter = "todos";
+let syncConfig = { token: "", gistId: "", ativo: false };
+let syncTimer = null;
+
+/* --- Armazenamento: window.storage quando disponível, senão localStorage --- */
+async function storageGetCompat(key) {
+  if (window.storage) {
+    try { return await window.storage.get(key); } catch (e) { /* cai para localStorage */ }
+  }
+  try { const v = localStorage.getItem(key); return v ? { key, value: v } : null; }
+  catch (e) { return null; }
+}
+async function storageSetCompat(key, value) {
+  if (window.storage) {
+    try { return await window.storage.set(key, value); } catch (e) { /* cai para localStorage */ }
+  }
+  try { localStorage.setItem(key, value); return { key, value }; }
+  catch (e) { return null; }
+}
+
+async function loadState() {
+  const res = await storageGetCompat(STORAGE_KEY);
+  if (res && res.value) {
+    try {
+      const parsed = JSON.parse(res.value);
+      memoriais = parsed.memoriais || [];
+      atualizadoEm = parsed.atualizadoEm || null;
+    } catch (e) { memoriais = []; }
+  }
+  const syncRes = await storageGetCompat(SYNC_KEY);
+  if (syncRes && syncRes.value) {
+    try { syncConfig = { ...syncConfig, ...JSON.parse(syncRes.value) }; } catch (e) {}
+  }
+}
+
+async function saveState() {
+  atualizadoEm = new Date().toISOString();
+  await storageSetCompat(STORAGE_KEY, JSON.stringify({ memoriais, atualizadoEm }));
+  if (syncConfig.ativo && syncConfig.token) scheduleAutoSync();
+}
+
+async function saveSyncConfig() {
+  await storageSetCompat(SYNC_KEY, JSON.stringify(syncConfig));
+}
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function fmtDate(iso) { if (!iso) return null; const [y, m, d] = iso.split("-"); return `${d}/${m}/${y}`; }
+function fmtMoney(v) { if (!v && v !== 0) return null; return Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); }
+function daysUntil(iso) { if (!iso) return null; const today = new Date(); today.setHours(0,0,0,0); const target = new Date(iso + "T00:00:00"); return Math.round((target - today) / 86400000); }
+function statusOf(m) { if (m.etapa === "Entregue") return "entregue"; const d = daysUntil(m.prazo); if (d !== null && d < 0) return "atrasado"; return "andamento"; }
+function escapeHtml(s) { const div = document.createElement("div"); div.textContent = s ?? ""; return div.innerHTML; }
+
+function showFlash(msg, kind) {
+  const el = document.getElementById("flash");
+  el.textContent = msg;
+  el.className = "flash is-visible";
+  el.style.background = kind === "err" ? "var(--danger-soft)" : "var(--sage-soft)";
+  el.style.color = kind === "err" ? "var(--danger)" : "var(--sage)";
+  setTimeout(() => el.classList.remove("is-visible"), 4500);
+}
+
+/* --- Renderização --- */
+function render() {
+  const ledgerEl = document.getElementById("ledger");
+  const emptyStateEl = document.getElementById("empty-state");
+  const subtitleEl = document.getElementById("subtitle");
+
+  const visible = memoriais
+    .filter((m) => currentFilter === "todos" || statusOf(m) === currentFilter)
+    .sort((a, b) => (a.prazo || "9999-99-99").localeCompare(b.prazo || "9999-99-99"));
+
+  ledgerEl.innerHTML = "";
+  emptyStateEl.classList.toggle("is-visible", memoriais.length === 0);
+
+  visible.forEach((m) => {
+    const status = statusOf(m);
+    const li = document.createElement("li");
+    li.className = "entry";
+    li.addEventListener("click", () => openEdit(m.id));
+    const tagLabel = { andamento: "Em andamento", entregue: "Entregue", atrasado: "Atrasado" }[status];
+    const deadlineDays = daysUntil(m.prazo);
+    let deadlineText = m.prazo ? `Prazo: ${fmtDate(m.prazo)}` : "Sem prazo definido";
+    let deadlineClass = "";
+    if (status !== "entregue" && deadlineDays !== null) {
+      if (deadlineDays < 0) { deadlineText += ` · ${Math.abs(deadlineDays)}d de atraso`; deadlineClass = "is-late"; }
+      else if (deadlineDays <= 5) { deadlineText += ` · faltam ${deadlineDays}d`; deadlineClass = "is-urgent"; }
+    }
+    li.innerHTML = `
+      <h3 class="entry-title">${escapeHtml(m.titulo)}</h3>
+      <div class="entry-client">${escapeHtml(m.cliente || "Sem cliente definido")}</div>
+      <div class="entry-meta">
+        <span class="tag tag-${status}">${tagLabel}</span>
+        <span class="entry-deadline ${deadlineClass}">${deadlineText}</span>
+        ${m.valor ? `<span class="entry-value">${fmtMoney(m.valor)}</span>` : ""}
+      </div>`;
+    ledgerEl.appendChild(li);
+  });
+
+  if (memoriais.length === 0) { subtitleEl.textContent = "nenhum memorial cadastrado ainda"; return; }
+  const emAndamento = memoriais.filter((m) => statusOf(m) === "andamento").length;
+  const atrasados = memoriais.filter((m) => statusOf(m) === "atrasado").length;
+  const parts = [`${emAndamento} em andamento`];
+  if (atrasados > 0) parts.push(`${atrasados} atrasado${atrasados > 1 ? "s" : ""}`);
+  subtitleEl.textContent = parts.join(", ");
+}
+
+/* --- Drawer novo/editar --- */
+const overlayEl = document.getElementById("overlay");
+const formEl = document.getElementById("form");
+const drawerTitleEl = document.getElementById("drawer-title");
+const btnDeleteEl = document.getElementById("btn-delete");
+
+function openNew() {
+  formEl.reset();
+  document.getElementById("field-id").value = "";
+  drawerTitleEl.textContent = "Novo memorial";
+  btnDeleteEl.style.display = "none";
+  overlayEl.classList.add("is-open");
+  document.getElementById("field-titulo").focus();
+}
+function openEdit(id) {
+  const m = memoriais.find((x) => x.id === id);
+  if (!m) return;
+  document.getElementById("field-id").value = m.id;
+  document.getElementById("field-titulo").value = m.titulo || "";
+  document.getElementById("field-cliente").value = m.cliente || "";
+  document.getElementById("field-etapa").value = m.etapa || "Rascunho";
+  document.getElementById("field-valor").value = m.valor || "";
+  document.getElementById("field-inicio").value = m.inicio || "";
+  document.getElementById("field-prazo").value = m.prazo || "";
+  document.getElementById("field-obs").value = m.obs || "";
+  drawerTitleEl.textContent = "Editar memorial";
+  btnDeleteEl.style.display = "";
+  overlayEl.classList.add("is-open");
+}
+function closeDrawer() { overlayEl.classList.remove("is-open"); }
+
+formEl.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const id = document.getElementById("field-id").value;
+  const data = {
+    titulo: document.getElementById("field-titulo").value.trim(),
+    cliente: document.getElementById("field-cliente").value.trim(),
+    etapa: document.getElementById("field-etapa").value,
+    valor: document.getElementById("field-valor").value,
+    inicio: document.getElementById("field-inicio").value,
+    prazo: document.getElementById("field-prazo").value,
+    obs: document.getElementById("field-obs").value.trim(),
+  };
+  if (id) { Object.assign(memoriais.find((x) => x.id === id), data); }
+  else { memoriais.push({ id: uid(), ...data }); }
+  await saveState();
+  render();
+  closeDrawer();
+});
+
+btnDeleteEl.addEventListener("click", async () => {
+  const id = document.getElementById("field-id").value;
+  if (!id || !confirm("Excluir este memorial? Essa ação não pode ser desfeita.")) return;
+  memoriais = memoriais.filter((x) => x.id !== id);
+  await saveState();
+  render();
+  closeDrawer();
+});
+
+document.getElementById("btn-new").addEventListener("click", openNew);
+document.getElementById("btn-close").addEventListener("click", closeDrawer);
+overlayEl.addEventListener("click", (e) => { if (e.target === overlayEl) closeDrawer(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeDrawer(); closeSyncPanel(); } });
+
+document.getElementById("filters").addEventListener("click", (e) => {
+  const btn = e.target.closest(".filter-tab");
+  if (!btn) return;
+  document.querySelectorAll(".filter-tab").forEach((b) => b.classList.remove("is-active"));
+  btn.classList.add("is-active");
+  currentFilter = btn.dataset.filter;
+  render();
+});
+
+/* --- Exportar / importar arquivo local --- */
+document.getElementById("btn-export").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify({ memoriais, atualizadoEm }, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `memoriais-${new Date().toISOString().slice(0, 10)}.json`; a.click();
+  URL.revokeObjectURL(url);
+});
+document.getElementById("import-file").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try {
+      const imported = JSON.parse(reader.result);
+      memoriais = Array.isArray(imported) ? imported : (imported.memoriais || []);
+      await saveState();
+      render();
+      showFlash("Dados importados com sucesso.");
+    } catch (err) { showFlash("Não foi possível importar esse arquivo.", "err"); }
+  };
+  reader.readAsText(file);
+  e.target.value = "";
+});
+
+/* --- Backup e sincronização (GitHub Gist) --- */
+const overlaySyncEl = document.getElementById("overlay-sync");
+document.getElementById("btn-sync").addEventListener("click", () => { overlaySyncEl.classList.add("is-open"); drawTabGithub(); });
+document.getElementById("btn-close-sync").addEventListener("click", closeSyncPanel);
+overlaySyncEl.addEventListener("click", (e) => { if (e.target === overlaySyncEl) closeSyncPanel(); });
+function closeSyncPanel() { overlaySyncEl.classList.remove("is-open"); }
+
+document.querySelectorAll(".tab").forEach((tab) => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach((t) => t.classList.remove("is-active"));
+    tab.classList.add("is-active");
+    if (tab.dataset.tab === "github") drawTabGithub(); else drawTabLocal();
+  });
+});
+
+function drawTabGithub() {
+  const cont = document.getElementById("sync-content");
+  cont.innerHTML = `
+    <p class="field-hint">Guarda os dados num Gist privado seu no GitHub. Crie um <em>fine-grained personal access token</em> só com permissão de "Gists" em github.com/settings/tokens.</p>
+    <label class="field"><span>Personal access token</span><input id="s-token" type="password" value="${escapeHtml(syncConfig.token)}" placeholder="github_pat_..."></label>
+    <label class="field"><span>ID do Gist (deixe em branco para criar um novo no primeiro backup)</span><input id="s-gist" type="text" value="${escapeHtml(syncConfig.gistId)}" placeholder="ex: 8f3a2b1c..."></label>
+    <div class="field" style="flex-direction:row;align-items:center;gap:10px;">
+      <button class="toggle${syncConfig.ativo ? " on" : ""}" id="s-ativo" type="button"></button>
+      <span>Sincronizar automaticamente a cada alteração</span>
+    </div>
+    <div class="field-status" id="s-status"></div>
+    <div class="drawer-actions" style="justify-content:flex-start;gap:10px;">
+      <button class="btn-secondary" id="s-salvar" type="button">Salvar configuração</button>
+      <button class="btn-secondary" id="s-agora" type="button">Fazer backup agora</button>
+      <button class="btn-secondary" id="s-restaurar" type="button">Restaurar deste Gist</button>
+    </div>`;
+  document.getElementById("s-ativo").onclick = (e) => e.target.classList.toggle("on");
+  const capturar = () => {
+    syncConfig.token = document.getElementById("s-token").value.trim();
+    syncConfig.gistId = document.getElementById("s-gist").value.trim();
+    syncConfig.ativo = document.getElementById("s-ativo").classList.contains("on");
+    saveSyncConfig();
+  };
+  const status = (msg, kind) => {
+    const el = document.getElementById("s-status");
+    el.textContent = msg;
+    el.className = "field-status " + (kind === "ok" ? "status-ok" : kind === "err" ? "status-err" : "status-pending");
+  };
+  document.getElementById("s-salvar").onclick = () => { capturar(); status("Configuração salva.", "ok"); };
+  document.getElementById("s-agora").onclick = async () => {
+    capturar(); status("Enviando backup…");
+    try { await backupGitHub(); document.getElementById("s-gist").value = syncConfig.gistId; status("Backup enviado com sucesso.", "ok"); }
+    catch (e) { status(e.message, "err"); }
+  };
+  document.getElementById("s-restaurar").onclick = async () => {
+    capturar(); status("Restaurando…");
+    try { await restaurarGitHub(); status("Dados restaurados do GitHub.", "ok"); render(); }
+    catch (e) { status(e.message, "err"); }
+  };
+}
+
+function drawTabLocal() {
+  const cont = document.getElementById("sync-content");
+  cont.innerHTML = `
+    <p class="field-hint">Exporta ou importa um arquivo .json manualmente. Se guardar o arquivo numa pasta sincronizada (Google Drive, OneDrive, Dropbox), funciona como backup automático sem precisar de token.</p>
+    <div class="drawer-actions" style="justify-content:flex-start;gap:10px;">
+      <button class="btn-secondary" id="s-export2" type="button">Exportar agora</button>
+      <label class="btn-secondary" for="s-import2" style="cursor:pointer;">Importar arquivo</label>
+      <input type="file" id="s-import2" accept="application/json" hidden>
+    </div>`;
+  document.getElementById("s-export2").onclick = () => document.getElementById("btn-export").click();
+  document.getElementById("s-import2").onchange = (e) => {
+    document.getElementById("import-file").files = e.target.files;
+    document.getElementById("import-file").dispatchEvent(new Event("change"));
+    closeSyncPanel();
+  };
+}
+
+async function backupGitHub() {
+  if (!syncConfig.token) throw new Error("Cole um token primeiro.");
+  const body = JSON.stringify({ memoriais, atualizadoEm: new Date().toISOString() }, null, 2);
+  const headers = { Authorization: `token ${syncConfig.token}`, Accept: "application/vnd.github+json" };
+  let res;
+  if (syncConfig.gistId) {
+    res = await fetch(`https://api.github.com/gists/${syncConfig.gistId}`, {
+      method: "PATCH", headers, body: JSON.stringify({ files: { [GIST_FILENAME]: { content: body } } }),
+    });
+  } else {
+    res = await fetch("https://api.github.com/gists", {
+      method: "POST", headers,
+      body: JSON.stringify({ description: "Backup — Memoriais tracker", public: false, files: { [GIST_FILENAME]: { content: body } } }),
+    });
+  }
+  if (!res.ok) throw new Error(`Falha no backup (${res.status}). Confira o token e a permissão de Gists.`);
+  const json = await res.json();
+  syncConfig.gistId = json.id;
+  await saveSyncConfig();
+}
+
+async function restaurarGitHub() {
+  if (!syncConfig.token || !syncConfig.gistId) throw new Error("Informe token e ID do Gist primeiro.");
+  const res = await fetch(`https://api.github.com/gists/${syncConfig.gistId}`, {
+    headers: { Authorization: `token ${syncConfig.token}`, Accept: "application/vnd.github+json" },
+  });
+  if (!res.ok) throw new Error(`Não foi possível ler o Gist (${res.status}).`);
+  const json = await res.json();
+  const file = json.files[GIST_FILENAME];
+  if (!file) throw new Error("Esse Gist não tem um backup deste app.");
+  const data = JSON.parse(file.content);
+  memoriais = data.memoriais || [];
+  atualizadoEm = data.atualizadoEm || null;
+  await storageSetCompat(STORAGE_KEY, JSON.stringify({ memoriais, atualizadoEm }));
+}
+
+function scheduleAutoSync() {
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => { backupGitHub().catch(() => {}); }, 2000);
+}
+
+async function checkRemoteOnLoad() {
+  if (!syncConfig.token || !syncConfig.gistId) return;
+  try {
+    const res = await fetch(`https://api.github.com/gists/${syncConfig.gistId}`, {
+      headers: { Authorization: `token ${syncConfig.token}`, Accept: "application/vnd.github+json" },
+    });
+    if (!res.ok) return;
+    const json = await res.json();
+    const file = json.files[GIST_FILENAME];
+    if (!file) return;
+    const remote = JSON.parse(file.content);
+    const remoteTime = remote.atualizadoEm ? new Date(remote.atualizadoEm).getTime() : 0;
+    const localTime = atualizadoEm ? new Date(atualizadoEm).getTime() : 0;
+    if (remoteTime > localTime + 5000) {
+      if (confirm("Existe um backup mais recente no GitHub. Restaurar agora?")) {
+        memoriais = remote.memoriais || [];
+        atualizadoEm = remote.atualizadoEm;
+        await storageSetCompat(STORAGE_KEY, JSON.stringify({ memoriais, atualizadoEm }));
+        render();
+      }
+    }
+  } catch (e) { /* silencioso: verificação em segundo plano */ }
+}
+
+(async function init() {
+  await loadState();
+  render();
+  checkRemoteOnLoad();
+})();
+</script>
+</body>
+</html>
