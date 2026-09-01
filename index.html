@@ -70,6 +70,23 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .entry-deadline.is-late { color: var(--danger); }
 .entry-value { font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 
+.entregas-mini { grid-column: 1 / -1; aspect-ratio: 16 / 9; width: min(100%, 480px); margin: 12px auto 0; background: var(--surface-alt); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; justify-content: center; gap: 14px; cursor: default; }
+.mini-steps { display: flex; align-items: flex-start; width: 100%; }
+.mini-step { flex: 1; display: flex; flex-direction: column; align-items: center; position: relative; min-width: 0; }
+.mini-connector { position: absolute; top: 6px; left: -50%; width: 100%; height: 2px; background: var(--line); z-index: 0; }
+.mini-connector.done { background: var(--ink-faint); }
+.mini-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); background: var(--surface); z-index: 1; box-sizing: border-box; }
+.mini-dot.mini-accent { border-color: var(--accent); }
+.mini-dot.mini-sage { border-color: var(--sage); }
+.mini-dot.mini-filled.mini-accent { background: var(--accent); }
+.mini-dot.mini-filled.mini-sage { background: var(--sage); }
+.mini-dot.mini-late { border-color: var(--danger); background: var(--danger-soft); }
+.mini-label { font-size: 11px; color: var(--ink-soft); margin-top: 6px; font-weight: 500; }
+.mini-date { font-size: 10.5px; color: var(--ink-faint); margin-top: 1px; }
+.mini-legend { display: flex; gap: 16px; justify-content: center; font-size: 11px; color: var(--ink-faint); flex-wrap: wrap; }
+.mini-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.mini-legend .mini-dot { border-width: 2px; }
+
 .tag-sem-previsao { background: var(--surface-alt); color: var(--ink-faint); }
 
 .crono { border-top: 1px solid var(--line); }
@@ -515,6 +532,7 @@ function renderLista(visible) {
       valorPartes.push(totalLaudas ? `${fmtMoney(m.valorLauda)}/lauda (${m.qtdLaudas} = ${fmtMoney(totalLaudas)})` : `${fmtMoney(m.valorLauda)}/lauda`);
     }
     let entregasHtml = "";
+    let entregasChartHtml = "";
     if (m.entregas && m.entregas.length > 0) {
       const today = new Date().toISOString().slice(0, 10);
       const concluidas = m.entregas.filter((e) => e.concluida).length;
@@ -523,6 +541,7 @@ function renderLista(visible) {
       let texto = `${concluidas}/${m.entregas.length} entregas`;
       if (atrasadas > 0) { texto += ` · ${atrasadas} atrasada${atrasadas > 1 ? "s" : ""}`; cls = "is-late"; }
       entregasHtml = `<span class="entry-deadline ${cls}">${texto}</span>`;
+      entregasChartHtml = `<div class="entregas-mini" data-mini-id="${m.id}"></div>`;
     }
     li.innerHTML = `
       <h3 class="entry-title">${escapeHtml(m.titulo)}${m.contratouLattes ? ` <span class="tag tag-andamento" style="font-size:10.5px;vertical-align:middle;">+ Lattes</span>` : ""}</h3>
@@ -532,9 +551,42 @@ function renderLista(visible) {
         <span class="entry-deadline ${deadlineClass}">${deadlineText}</span>
         ${entregasHtml}
         ${valorPartes.map((v) => `<span class="entry-value">${v}</span>`).join("")}
-      </div>`;
+      </div>
+      ${entregasChartHtml}`;
     ledgerEl.appendChild(li);
+    if (m.entregas && m.entregas.length > 0) {
+      renderEntregasMini(li.querySelector(".entregas-mini"), m.entregas);
+    }
   });
+}
+
+/* --- Resumo visual das entregas de cada cliente, na tela inicial --- */
+function renderEntregasMini(container, entregas) {
+  if (!container) return;
+  container.addEventListener("click", (e) => e.stopPropagation());
+  const today = new Date().toISOString().slice(0, 10);
+  const stepsHtml = entregas.map((e, i) => {
+    const cor = e.responsavel === "cliente" ? "sage" : "accent";
+    const atrasada = !e.concluida && e.data && e.data < today;
+    let dotClass = `mini-${cor}`;
+    if (e.concluida) dotClass += " mini-filled";
+    if (atrasada) dotClass = "mini-late";
+    const connectorDone = i > 0 && entregas[i - 1].concluida;
+    return `
+      <div class="mini-step">
+        ${i > 0 ? `<div class="mini-connector ${connectorDone ? "done" : ""}"></div>` : ""}
+        <div class="mini-dot ${dotClass}" title="${escapeHtml(e.descricao || "")}"></div>
+        <div class="mini-label">E${i + 1}</div>
+        <div class="mini-date">${e.data ? fmtDate(e.data) : "—"}</div>
+      </div>`;
+  }).join("");
+  container.innerHTML = `
+    <div class="mini-steps">${stepsHtml}</div>
+    <div class="mini-legend">
+      <span><span class="mini-dot mini-filled mini-accent" style="width:9px;height:9px;"></span> Minha</span>
+      <span><span class="mini-dot mini-filled mini-sage" style="width:9px;height:9px;"></span> Do cliente</span>
+      <span><span class="mini-dot mini-late" style="width:9px;height:9px;"></span> Atrasada</span>
+    </div>`;
 }
 
 /* --- Painel: gráficos da tela inicial --- */
