@@ -178,24 +178,69 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
     <label class="field"><span>Cliente</span>
       <input type="text" id="field-cliente" placeholder="Nome de quem encomendou">
     </label>
+
     <div class="field-row">
-      <label class="field"><span>Etapa atual</span>
-        <select id="field-etapa">
-          <option>Levantamento de dados</option>
-          <option>Rascunho</option>
-          <option>Revisão</option>
-          <option>Diagramação</option>
-          <option>Entregue</option>
+      <label class="field"><span>Categoria</span>
+        <select id="field-categoria">
+          <option value="Doutor">Doutor</option>
+          <option value="Associado">Associado</option>
+          <option value="Titular">Titular</option>
+          <option value="Outro">Outro</option>
         </select>
       </label>
-      <label class="field"><span>Valor (R$)</span>
-        <input type="number" id="field-valor" placeholder="0,00" step="0.01" min="0">
+      <label class="field" id="field-categoria-outro-wrap" hidden>
+        <span>Especifique a categoria</span>
+        <input type="text" id="field-categoria-outro" placeholder="Categoria">
       </label>
     </div>
+
+    <div class="field-row">
+      <label class="field"><span>Instituição</span>
+        <select id="field-instituicao">
+          <option value="FZEA">FZEA</option>
+          <option value="FMVZ">FMVZ</option>
+          <option value="Outro">Outro</option>
+        </select>
+      </label>
+      <label class="field" id="field-instituicao-outro-wrap" hidden>
+        <span>Especifique a instituição</span>
+        <input type="text" id="field-instituicao-outro" placeholder="Instituição">
+      </label>
+    </div>
+
+    <label class="field"><span>Etapa atual</span>
+      <select id="field-etapa">
+        <option>Levantamento de dados</option>
+        <option>Rascunho</option>
+        <option>Revisão</option>
+        <option>Diagramação</option>
+        <option>Entregue</option>
+      </select>
+    </label>
+
     <div class="field-row">
       <label class="field"><span>Início</span><input type="date" id="field-inicio"></label>
       <label class="field"><span>Prazo</span><input type="date" id="field-prazo"></label>
     </div>
+
+    <label class="field"><span>Valor da hora (R$)</span>
+      <input type="number" id="field-valor-hora" placeholder="0,00" step="0.01" min="0">
+    </label>
+
+    <div class="field" style="flex-direction:row;align-items:center;gap:10px;">
+      <button class="toggle" id="field-cobra-lauda" type="button"></button>
+      <span>Também cobro por lauda</span>
+    </div>
+
+    <div class="field-row" id="field-lauda-wrap" hidden>
+      <label class="field"><span>Valor da lauda (R$)</span>
+        <input type="number" id="field-valor-lauda" placeholder="0,00" step="0.01" min="0">
+      </label>
+      <label class="field"><span>Laudas produzidas</span>
+        <input type="number" id="field-qtd-laudas" placeholder="0" step="1" min="0">
+      </label>
+    </div>
+
     <label class="field"><span>Observações</span>
       <textarea id="field-obs" rows="4" placeholder="Anotações sobre o andamento, pendências, contato do cliente..."></textarea>
     </label>
@@ -315,13 +360,20 @@ function render() {
       if (deadlineDays < 0) { deadlineText += ` · ${Math.abs(deadlineDays)}d de atraso`; deadlineClass = "is-late"; }
       else if (deadlineDays <= 5) { deadlineText += ` · faltam ${deadlineDays}d`; deadlineClass = "is-urgent"; }
     }
+    const clienteLinha = [m.cliente, [m.categoria, m.instituicao].filter(Boolean).join(" · ")].filter(Boolean).join(" — ");
+    const valorPartes = [];
+    if (m.valorHora) valorPartes.push(`${fmtMoney(m.valorHora)}/hora`);
+    if (m.cobraLauda && m.valorLauda) {
+      const totalLaudas = m.qtdLaudas ? Number(m.valorLauda) * Number(m.qtdLaudas) : null;
+      valorPartes.push(totalLaudas ? `${fmtMoney(m.valorLauda)}/lauda (${m.qtdLaudas} = ${fmtMoney(totalLaudas)})` : `${fmtMoney(m.valorLauda)}/lauda`);
+    }
     li.innerHTML = `
       <h3 class="entry-title">${escapeHtml(m.titulo)}</h3>
-      <div class="entry-client">${escapeHtml(m.cliente || "Sem cliente definido")}</div>
+      <div class="entry-client">${escapeHtml(clienteLinha || "Sem cliente definido")}</div>
       <div class="entry-meta">
         <span class="tag tag-${status}">${tagLabel}</span>
         <span class="entry-deadline ${deadlineClass}">${deadlineText}</span>
-        ${m.valor ? `<span class="entry-value">${fmtMoney(m.valor)}</span>` : ""}
+        ${valorPartes.map((v) => `<span class="entry-value">${v}</span>`).join("")}
       </div>`;
     ledgerEl.appendChild(li);
   });
@@ -340,9 +392,26 @@ const formEl = document.getElementById("form");
 const drawerTitleEl = document.getElementById("drawer-title");
 const btnDeleteEl = document.getElementById("btn-delete");
 
+function toggleCategoriaOutro() {
+  document.getElementById("field-categoria-outro-wrap").hidden = document.getElementById("field-categoria").value !== "Outro";
+}
+function toggleInstituicaoOutro() {
+  document.getElementById("field-instituicao-outro-wrap").hidden = document.getElementById("field-instituicao").value !== "Outro";
+}
+function toggleLaudaWrap() {
+  document.getElementById("field-lauda-wrap").hidden = !document.getElementById("field-cobra-lauda").classList.contains("on");
+}
+document.getElementById("field-categoria").addEventListener("change", toggleCategoriaOutro);
+document.getElementById("field-instituicao").addEventListener("change", toggleInstituicaoOutro);
+document.getElementById("field-cobra-lauda").addEventListener("click", (e) => { e.target.classList.toggle("on"); toggleLaudaWrap(); });
+
 function openNew() {
   formEl.reset();
   document.getElementById("field-id").value = "";
+  document.getElementById("field-cobra-lauda").classList.remove("on");
+  toggleCategoriaOutro();
+  toggleInstituicaoOutro();
+  toggleLaudaWrap();
   drawerTitleEl.textContent = "Novo memorial";
   btnDeleteEl.style.display = "none";
   overlayEl.classList.add("is-open");
@@ -354,11 +423,21 @@ function openEdit(id) {
   document.getElementById("field-id").value = m.id;
   document.getElementById("field-titulo").value = m.titulo || "";
   document.getElementById("field-cliente").value = m.cliente || "";
+  document.getElementById("field-categoria").value = ["Doutor", "Associado", "Titular"].includes(m.categoria) ? m.categoria : (m.categoria ? "Outro" : "Doutor");
+  document.getElementById("field-categoria-outro").value = document.getElementById("field-categoria").value === "Outro" ? (m.categoria || "") : "";
+  document.getElementById("field-instituicao").value = ["FZEA", "FMVZ"].includes(m.instituicao) ? m.instituicao : (m.instituicao ? "Outro" : "FZEA");
+  document.getElementById("field-instituicao-outro").value = document.getElementById("field-instituicao").value === "Outro" ? (m.instituicao || "") : "";
   document.getElementById("field-etapa").value = m.etapa || "Rascunho";
-  document.getElementById("field-valor").value = m.valor || "";
   document.getElementById("field-inicio").value = m.inicio || "";
   document.getElementById("field-prazo").value = m.prazo || "";
+  document.getElementById("field-valor-hora").value = m.valorHora || "";
+  document.getElementById("field-cobra-lauda").classList.toggle("on", !!m.cobraLauda);
+  document.getElementById("field-valor-lauda").value = m.valorLauda || "";
+  document.getElementById("field-qtd-laudas").value = m.qtdLaudas || "";
   document.getElementById("field-obs").value = m.obs || "";
+  toggleCategoriaOutro();
+  toggleInstituicaoOutro();
+  toggleLaudaWrap();
   drawerTitleEl.textContent = "Editar memorial";
   btnDeleteEl.style.display = "";
   overlayEl.classList.add("is-open");
@@ -368,13 +447,21 @@ function closeDrawer() { overlayEl.classList.remove("is-open"); }
 formEl.addEventListener("submit", async (e) => {
   e.preventDefault();
   const id = document.getElementById("field-id").value;
+  const categoriaSel = document.getElementById("field-categoria").value;
+  const instituicaoSel = document.getElementById("field-instituicao").value;
+  const cobraLauda = document.getElementById("field-cobra-lauda").classList.contains("on");
   const data = {
     titulo: document.getElementById("field-titulo").value.trim(),
     cliente: document.getElementById("field-cliente").value.trim(),
+    categoria: categoriaSel === "Outro" ? document.getElementById("field-categoria-outro").value.trim() : categoriaSel,
+    instituicao: instituicaoSel === "Outro" ? document.getElementById("field-instituicao-outro").value.trim() : instituicaoSel,
     etapa: document.getElementById("field-etapa").value,
-    valor: document.getElementById("field-valor").value,
     inicio: document.getElementById("field-inicio").value,
     prazo: document.getElementById("field-prazo").value,
+    valorHora: document.getElementById("field-valor-hora").value,
+    cobraLauda: cobraLauda,
+    valorLauda: cobraLauda ? document.getElementById("field-valor-lauda").value : "",
+    qtdLaudas: cobraLauda ? document.getElementById("field-qtd-laudas").value : "",
     obs: document.getElementById("field-obs").value.trim(),
   };
   if (id) { Object.assign(memoriais.find((x) => x.id === id), data); }
