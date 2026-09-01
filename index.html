@@ -124,11 +124,17 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .drawer { width: 420px; max-width: calc(100% - 32px); max-height: calc(100% - 32px); background: var(--surface); padding: 28px 26px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 12px 32px rgba(0,0,0,0.14); border-radius: var(--radius); }
 
 /* Tela de edição do memorial: ocupa a página inteira, não é gaveta lateral */
+/* Tela de edição do memorial: página cheia no mobile; janela 16:9 em telas maiores */
 .overlay#overlay { justify-content: center; align-items: stretch; background: var(--bg); }
-.overlay#overlay .drawer { width: 100%; max-width: 760px; height: 100%; max-height: 100%; margin: 0 auto; border-radius: 0; box-shadow: none; padding: 40px clamp(20px, 5vw, 40px); opacity: 0; transition: opacity 0.15s ease; }
+.overlay#overlay .drawer { width: 100%; max-width: 760px; height: 100%; max-height: 100%; margin: 0 auto; border-radius: 0; box-shadow: none; padding: 40px clamp(20px, 5vw, 40px); opacity: 0; transition: opacity 0.15s ease, transform 0.15s ease; overflow-y: auto; }
 .overlay#overlay.is-open .drawer { opacity: 1; }
+@media (min-width: 820px) {
+  .overlay#overlay { align-items: center; background: rgba(34, 31, 25, 0.45); }
+  .overlay#overlay .drawer { width: min(94vw, 166vh); aspect-ratio: 16 / 9; max-width: 1400px; max-height: 92vh; height: auto; border-radius: 8px; box-shadow: 0 24px 64px rgba(20, 17, 12, 0.28); transform: scale(0.98); }
+  .overlay#overlay.is-open .drawer { transform: scale(1); }
+}
 
-.drawer-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.drawer-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; position: sticky; top: 0; background: var(--surface); z-index: 2; padding: 4px 0; }
 .drawer-head h2 { font-family: var(--serif); font-weight: 500; font-size: 22px; margin: 0; }
 .btn-icon { background: none; border: none; font-size: 16px; color: var(--ink-soft); cursor: pointer; padding: 4px; }
 .btn-icon:hover { color: var(--ink); }
