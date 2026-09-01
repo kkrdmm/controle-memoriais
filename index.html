@@ -119,6 +119,14 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .field-hint { font-size: 12.5px; color: var(--ink-faint); margin: -6px 0 4px; }
 .field-group-title { font-family: var(--serif); font-size: 14.5px; color: var(--ink-soft); margin: 8px 0 -4px; }
 .field input:disabled { color: var(--ink-faint); background: var(--surface); }
+
+.entrega-row { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; display: flex; flex-direction: column; gap: 10px; margin-top: 10px; background: var(--surface-alt); }
+.entrega-row-head { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--ink-soft); font-weight: 500; }
+.entrega-remove { background: none; border: none; color: var(--ink-faint); font-size: 12.5px; cursor: pointer; text-decoration: underline; }
+.entrega-remove:hover { color: var(--danger); }
+.field-checkbox { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--ink); flex-direction: row !important; }
+.field-checkbox input { width: auto; accent-color: var(--accent); }
+.entrega-empty { font-size: 13px; color: var(--ink-faint); margin-top: 8px; }
 .field-row { display: flex; gap: 12px; }
 
 .drawer-actions { margin-top: auto; padding-top: 16px; display: flex; justify-content: space-between; align-items: center; }
@@ -287,6 +295,12 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
       </label>
     </div>
 
+    <div class="field-group-title">Entregas combinadas</div>
+    <label class="field"><span>Quantas entregas estão previstas?</span>
+      <input type="number" id="field-qtd-entregas" min="0" step="1" placeholder="0">
+    </label>
+    <div id="entregas-list"></div>
+
     <label class="field"><span>Observações</span>
       <textarea id="field-obs" rows="4" placeholder="Anotações sobre o andamento, pendências, contato do cliente..."></textarea>
     </label>
@@ -447,12 +461,23 @@ function renderLista(visible) {
       const totalLaudas = m.qtdLaudas ? Number(m.valorLauda) * Number(m.qtdLaudas) : null;
       valorPartes.push(totalLaudas ? `${fmtMoney(m.valorLauda)}/lauda (${m.qtdLaudas} = ${fmtMoney(totalLaudas)})` : `${fmtMoney(m.valorLauda)}/lauda`);
     }
+    let entregasHtml = "";
+    if (m.entregas && m.entregas.length > 0) {
+      const today = new Date().toISOString().slice(0, 10);
+      const concluidas = m.entregas.filter((e) => e.concluida).length;
+      const atrasadas = m.entregas.filter((e) => !e.concluida && e.data && e.data < today).length;
+      let cls = "";
+      let texto = `${concluidas}/${m.entregas.length} entregas`;
+      if (atrasadas > 0) { texto += ` · ${atrasadas} atrasada${atrasadas > 1 ? "s" : ""}`; cls = "is-late"; }
+      entregasHtml = `<span class="entry-deadline ${cls}">${texto}</span>`;
+    }
     li.innerHTML = `
       <h3 class="entry-title">${escapeHtml(m.titulo)}</h3>
       <div class="entry-client">${escapeHtml(clienteLinha || "Sem instituição definida")}</div>
       <div class="entry-meta">
         <span class="tag tag-${status}">${tagLabel}</span>
         <span class="entry-deadline ${deadlineClass}">${deadlineText}</span>
+        ${entregasHtml}
         ${valorPartes.map((v) => `<span class="entry-value">${v}</span>`).join("")}
       </div>`;
     ledgerEl.appendChild(li);
@@ -548,6 +573,69 @@ function toggleHintProspeccao() {
 }
 document.getElementById("field-etapa").addEventListener("change", toggleHintProspeccao);
 
+/* --- Entregas customizadas por memorial --- */
+function renderEntregasFields(qtd, existentes) {
+  const wrap = document.getElementById("entregas-list");
+  const atuais = coletarEntregasDoForm(wrap.children.length);
+  const base = existentes || atuais;
+  wrap.innerHTML = "";
+  if (qtd === 0) {
+    wrap.innerHTML = `<p class="entrega-empty">Nenhuma entrega combinada ainda.</p>`;
+    return;
+  }
+  for (let i = 0; i < qtd; i++) {
+    const e = base[i] || { responsavel: "minha", data: "", descricao: "", concluida: false };
+    const row = document.createElement("div");
+    row.className = "entrega-row";
+    row.innerHTML = `
+      <div class="entrega-row-head">
+        <span>Entrega ${i + 1}</span>
+        <button type="button" class="entrega-remove" data-index="${i}">Remover</button>
+      </div>
+      <div class="field-row">
+        <label class="field"><span>Responsável</span>
+          <select class="entrega-responsavel">
+            <option value="minha" ${e.responsavel === "minha" ? "selected" : ""}>Minha (eu entrego)</option>
+            <option value="cliente" ${e.responsavel === "cliente" ? "selected" : ""}>Do cliente (ele me entrega)</option>
+          </select>
+        </label>
+        <label class="field"><span>Data prevista</span>
+          <input type="date" class="entrega-data" value="${e.data || ""}">
+        </label>
+      </div>
+      <label class="field"><span>O que deve ser entregue</span>
+        <input type="text" class="entrega-descricao" placeholder="Ex.: Rascunho do capítulo 2" value="${escapeHtml(e.descricao || "")}">
+      </label>
+      <label class="field-checkbox"><input type="checkbox" class="entrega-concluida" ${e.concluida ? "checked" : ""}> Concluída</label>`;
+    wrap.appendChild(row);
+  }
+  wrap.querySelectorAll(".entrega-remove").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const idx = Number(btn.dataset.index);
+      const restantes = coletarEntregasDoForm(qtd).filter((_, i) => i !== idx);
+      document.getElementById("field-qtd-entregas").value = restantes.length;
+      renderEntregasFields(restantes.length, restantes);
+    });
+  });
+}
+function coletarEntregasDoForm(qtd) {
+  const rows = document.querySelectorAll("#entregas-list .entrega-row");
+  const out = [];
+  rows.forEach((row) => {
+    out.push({
+      responsavel: row.querySelector(".entrega-responsavel").value,
+      data: row.querySelector(".entrega-data").value,
+      descricao: row.querySelector(".entrega-descricao").value.trim(),
+      concluida: row.querySelector(".entrega-concluida").checked,
+    });
+  });
+  return out;
+}
+document.getElementById("field-qtd-entregas").addEventListener("input", (e) => {
+  const qtd = Math.max(0, Math.min(30, parseInt(e.target.value, 10) || 0));
+  renderEntregasFields(qtd);
+});
+
 function openNew(etapaInicial) {
   formEl.reset();
   document.getElementById("field-id").value = "";
@@ -558,6 +646,8 @@ function openNew(etapaInicial) {
   toggleLaudaWrap();
   toggleHintProspeccao();
   syncPrevEntregueDisplay();
+  document.getElementById("field-qtd-entregas").value = "";
+  renderEntregasFields(0);
   drawerTitleEl.textContent = etapaInicial === "Prospecção" ? "Novo cliente futuro" : "Novo memorial";
   btnDeleteEl.style.display = "none";
   overlayEl.classList.add("is-open");
@@ -588,6 +678,9 @@ function openEdit(id) {
   toggleLaudaWrap();
   toggleHintProspeccao();
   syncPrevEntregueDisplay();
+  const entregas = m.entregas || [];
+  document.getElementById("field-qtd-entregas").value = entregas.length || "";
+  renderEntregasFields(entregas.length, entregas);
   drawerTitleEl.textContent = "Editar memorial";
   btnDeleteEl.style.display = "";
   overlayEl.classList.add("is-open");
@@ -617,6 +710,7 @@ formEl.addEventListener("submit", async (e) => {
     cobraLauda: cobraLauda,
     valorLauda: cobraLauda ? document.getElementById("field-valor-lauda").value : "",
     qtdLaudas: cobraLauda ? document.getElementById("field-qtd-laudas").value : "",
+    entregas: coletarEntregasDoForm(),
     obs: document.getElementById("field-obs").value.trim(),
   };
   if (id) { Object.assign(memoriais.find((x) => x.id === id), data); }
