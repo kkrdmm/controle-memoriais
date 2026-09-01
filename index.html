@@ -349,9 +349,19 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
     </div>
     <p class="field-hint">"Previsão: Entregue" usa o Prazo final acima. Deixe as datas em branco para etapas sem previsão definida.</p>
 
-    <label class="field"><span>Valor da hora (R$)</span>
-      <input type="number" id="field-valor-hora" placeholder="0,00" step="0.01" min="0">
-    </label>
+    <div class="field" style="flex-direction:row;align-items:center;gap:10px;">
+      <button class="toggle" id="field-emite-nota" type="button"></button>
+      <span id="field-emite-nota-label">CPF (sem nota fiscal)</span>
+    </div>
+
+    <div class="field-row">
+      <label class="field"><span>Valor da hora (R$)</span>
+        <input type="number" id="field-valor-hora" placeholder="0,00" step="0.01" min="0">
+      </label>
+      <label class="field"><span>Horas trabalhadas</span>
+        <input type="number" id="field-horas-trabalhadas" placeholder="0" step="0.5" min="0">
+      </label>
+    </div>
 
     <div class="field" style="flex-direction:row;align-items:center;gap:10px;">
       <button class="toggle" id="field-cobra-lauda" type="button"></button>
@@ -366,6 +376,8 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
         <input type="number" id="field-qtd-laudas" placeholder="0" step="1" min="0">
       </label>
     </div>
+
+    <p class="field-hint" id="valor-total-resumo"></p>
 
     <div class="field" style="flex-direction:row;align-items:center;gap:10px;">
       <button class="toggle" id="field-contratou-lattes" type="button"></button>
@@ -540,12 +552,15 @@ function renderLista(visible) {
       else if (deadlineDays <= 5) { deadlineText += ` · faltam ${deadlineDays}d`; deadlineClass = "is-urgent"; }
     }
     const clienteLinha = m.instituicao || "";
+    const totalHoras = (Number(m.valorHora) || 0) * (Number(m.horasTrabalhadas) || 0);
+    const totalLaudasCalc = m.cobraLauda ? (Number(m.valorLauda) || 0) * (Number(m.qtdLaudas) || 0) : 0;
+    const totalGeral = totalHoras + totalLaudasCalc;
     const valorPartes = [];
-    if (m.valorHora) valorPartes.push(`${fmtMoney(m.valorHora)}/hora`);
+    if (m.valorHora) valorPartes.push(`${fmtMoney(m.valorHora)}/hora${m.horasTrabalhadas ? ` × ${m.horasTrabalhadas}h` : ""}`);
     if (m.cobraLauda && m.valorLauda) {
-      const totalLaudas = m.qtdLaudas ? Number(m.valorLauda) * Number(m.qtdLaudas) : null;
-      valorPartes.push(totalLaudas ? `${fmtMoney(m.valorLauda)}/lauda (${m.qtdLaudas} = ${fmtMoney(totalLaudas)})` : `${fmtMoney(m.valorLauda)}/lauda`);
+      valorPartes.push(totalLaudasCalc ? `${fmtMoney(m.valorLauda)}/lauda (${m.qtdLaudas})` : `${fmtMoney(m.valorLauda)}/lauda`);
     }
+    if (totalGeral > 0) valorPartes.push(`Total: ${fmtMoney(totalGeral)}`);
     let entregasHtml = "";
     let entregasChartHtml = "";
     if (m.entregas && m.entregas.length > 0) {
@@ -559,7 +574,7 @@ function renderLista(visible) {
       entregasChartHtml = `<div class="entregas-mini" data-mini-id="${m.id}"></div>`;
     }
     li.innerHTML = `
-      <h3 class="entry-title">${escapeHtml(m.titulo)}${m.contratouLattes ? ` <span class="tag tag-andamento" style="font-size:10.5px;vertical-align:middle;">+ Lattes</span>` : ""}</h3>
+      <h3 class="entry-title">${escapeHtml(m.titulo)}${m.tipoDocumento === "CNPJ" ? ` <span class="tag tag-sem-previsao" style="font-size:10.5px;vertical-align:middle;">CNPJ</span>` : ""}${m.contratouLattes ? ` <span class="tag tag-andamento" style="font-size:10.5px;vertical-align:middle;">+ Lattes</span>` : ""}</h3>
       <div class="entry-client">${escapeHtml(clienteLinha || "Sem instituição definida")}</div>
       <div class="entry-meta">
         <span class="tag tag-${status}">${tagLabel}</span>
@@ -739,11 +754,36 @@ function toggleInstituicaoOutro() {
 }
 function toggleLaudaWrap() {
   document.getElementById("field-lauda-wrap").hidden = !document.getElementById("field-cobra-lauda").classList.contains("on");
+  atualizarResumoValor();
+}
+function toggleEmiteNotaLabel() {
+  const on = document.getElementById("field-emite-nota").classList.contains("on");
+  document.getElementById("field-emite-nota-label").textContent = on ? "CNPJ (emite nota fiscal)" : "CPF (sem nota fiscal)";
+}
+function atualizarResumoValor() {
+  const valorHora = parseFloat(document.getElementById("field-valor-hora").value) || 0;
+  const horas = parseFloat(document.getElementById("field-horas-trabalhadas").value) || 0;
+  const cobraLauda = document.getElementById("field-cobra-lauda").classList.contains("on");
+  const valorLauda = parseFloat(document.getElementById("field-valor-lauda").value) || 0;
+  const qtdLaudas = parseFloat(document.getElementById("field-qtd-laudas").value) || 0;
+  const totalHoras = valorHora * horas;
+  const totalLaudas = cobraLauda ? valorLauda * qtdLaudas : 0;
+  const total = totalHoras + totalLaudas;
+  const resumo = document.getElementById("valor-total-resumo");
+  if (!valorHora && !cobraLauda) { resumo.textContent = ""; return; }
+  const partes = [];
+  if (totalHoras) partes.push(`${fmtMoney(totalHoras)} em horas (${horas}h × ${fmtMoney(valorHora)})`);
+  if (totalLaudas) partes.push(`${fmtMoney(totalLaudas)} em laudas (${qtdLaudas} × ${fmtMoney(valorLauda)})`);
+  resumo.textContent = partes.length ? `Total estimado: ${fmtMoney(total)} — ${partes.join(" + ")}` : "";
 }
 document.getElementById("field-categoria").addEventListener("change", toggleCategoriaOutro);
 document.getElementById("field-instituicao").addEventListener("change", toggleInstituicaoOutro);
 document.getElementById("field-cobra-lauda").addEventListener("click", (e) => { e.target.classList.toggle("on"); toggleLaudaWrap(); });
 document.getElementById("field-contratou-lattes").addEventListener("click", (e) => e.target.classList.toggle("on"));
+document.getElementById("field-emite-nota").addEventListener("click", (e) => { e.target.classList.toggle("on"); toggleEmiteNotaLabel(); });
+["field-valor-hora", "field-horas-trabalhadas", "field-valor-lauda", "field-qtd-laudas"].forEach((id) => {
+  document.getElementById(id).addEventListener("input", atualizarResumoValor);
+});
 
 function syncPrevEntregueDisplay() {
   document.getElementById("field-prev-entregue-display").value = document.getElementById("field-prazo").value;
@@ -944,10 +984,12 @@ function openNew(etapaInicial) {
   document.getElementById("field-id").value = "";
   document.getElementById("field-cobra-lauda").classList.remove("on");
   document.getElementById("field-contratou-lattes").classList.remove("on");
+  document.getElementById("field-emite-nota").classList.remove("on");
   document.getElementById("field-etapa").value = etapaInicial || "Levantamento de dados";
   toggleCategoriaOutro();
   toggleInstituicaoOutro();
   toggleLaudaWrap();
+  toggleEmiteNotaLabel();
   toggleHintProspeccao();
   syncPrevEntregueDisplay();
   document.getElementById("field-qtd-entregas").value = "";
@@ -976,14 +1018,17 @@ function openEdit(id) {
   document.getElementById("field-prev-revisao").value = m.prevRevisao || "";
   document.getElementById("field-prev-diagramacao").value = m.prevDiagramacao || "";
   document.getElementById("field-valor-hora").value = m.valorHora || "";
+  document.getElementById("field-horas-trabalhadas").value = m.horasTrabalhadas || "";
   document.getElementById("field-cobra-lauda").classList.toggle("on", !!m.cobraLauda);
   document.getElementById("field-valor-lauda").value = m.valorLauda || "";
   document.getElementById("field-qtd-laudas").value = m.qtdLaudas || "";
   document.getElementById("field-contratou-lattes").classList.toggle("on", !!m.contratouLattes);
+  document.getElementById("field-emite-nota").classList.toggle("on", m.tipoDocumento === "CNPJ");
   document.getElementById("field-obs").value = m.obs || "";
   toggleCategoriaOutro();
   toggleInstituicaoOutro();
   toggleLaudaWrap();
+  toggleEmiteNotaLabel();
   toggleHintProspeccao();
   syncPrevEntregueDisplay();
   const entregas = m.entregas || [];
@@ -1018,6 +1063,8 @@ formEl.addEventListener("submit", async (e) => {
     prevRevisao: document.getElementById("field-prev-revisao").value,
     prevDiagramacao: document.getElementById("field-prev-diagramacao").value,
     valorHora: document.getElementById("field-valor-hora").value,
+    horasTrabalhadas: document.getElementById("field-horas-trabalhadas").value,
+    tipoDocumento: document.getElementById("field-emite-nota").classList.contains("on") ? "CNPJ" : "CPF",
     cobraLauda: cobraLauda,
     valorLauda: cobraLauda ? document.getElementById("field-valor-lauda").value : "",
     qtdLaudas: cobraLauda ? document.getElementById("field-qtd-laudas").value : "",
