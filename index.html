@@ -205,11 +205,8 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
       <button type="button" class="btn-icon" id="btn-close" aria-label="Fechar">✕</button>
     </div>
     <input type="hidden" id="field-id">
-    <label class="field"><span>Título do memorial</span>
-      <input type="text" id="field-titulo" placeholder="Ex.: Memorial de progressão — Profa. Ana Lima" required>
-    </label>
     <label class="field"><span>Cliente</span>
-      <input type="text" id="field-cliente" placeholder="Nome de quem encomendou">
+      <input type="text" id="field-cliente" placeholder="Nome de quem encomendou" required>
     </label>
 
     <div class="field-row">
@@ -430,7 +427,7 @@ function renderLista(visible) {
       if (deadlineDays < 0) { deadlineText += ` · ${Math.abs(deadlineDays)}d de atraso`; deadlineClass = "is-late"; }
       else if (deadlineDays <= 5) { deadlineText += ` · faltam ${deadlineDays}d`; deadlineClass = "is-urgent"; }
     }
-    const clienteLinha = [m.cliente, [m.categoria, m.instituicao].filter(Boolean).join(" · ")].filter(Boolean).join(" — ");
+    const clienteLinha = m.instituicao || "";
     const valorPartes = [];
     if (m.valorHora) valorPartes.push(`${fmtMoney(m.valorHora)}/hora`);
     if (m.cobraLauda && m.valorLauda) {
@@ -439,7 +436,7 @@ function renderLista(visible) {
     }
     li.innerHTML = `
       <h3 class="entry-title">${escapeHtml(m.titulo)}</h3>
-      <div class="entry-client">${escapeHtml(clienteLinha || "Sem cliente definido")}</div>
+      <div class="entry-client">${escapeHtml(clienteLinha || "Sem instituição definida")}</div>
       <div class="entry-meta">
         <span class="tag tag-${status}">${tagLabel}</span>
         <span class="entry-deadline ${deadlineClass}">${deadlineText}</span>
@@ -499,7 +496,7 @@ function renderCrono(visible) {
       <div class="crono-head">
         <div>
           <h3 class="entry-title" style="margin:0;">${escapeHtml(m.titulo)}</h3>
-          <div class="entry-client">${escapeHtml(m.cliente || "Sem cliente definido")}</div>
+          <div class="entry-client">${escapeHtml(m.instituicao || "")}</div>
         </div>
         <span class="tag ${classMap[cs]}">${labelMap[cs]}</span>
       </div>
@@ -543,13 +540,12 @@ function openNew() {
   drawerTitleEl.textContent = "Novo memorial";
   btnDeleteEl.style.display = "none";
   overlayEl.classList.add("is-open");
-  document.getElementById("field-titulo").focus();
+  document.getElementById("field-cliente").focus();
 }
 function openEdit(id) {
   const m = memoriais.find((x) => x.id === id);
   if (!m) return;
   document.getElementById("field-id").value = m.id;
-  document.getElementById("field-titulo").value = m.titulo || "";
   document.getElementById("field-cliente").value = m.cliente || "";
   document.getElementById("field-categoria").value = ["Doutor", "Associado", "Titular"].includes(m.categoria) ? m.categoria : (m.categoria ? "Outro" : "Doutor");
   document.getElementById("field-categoria-outro").value = document.getElementById("field-categoria").value === "Outro" ? (m.categoria || "") : "";
@@ -582,10 +578,12 @@ formEl.addEventListener("submit", async (e) => {
   const categoriaSel = document.getElementById("field-categoria").value;
   const instituicaoSel = document.getElementById("field-instituicao").value;
   const cobraLauda = document.getElementById("field-cobra-lauda").classList.contains("on");
+  const cliente = document.getElementById("field-cliente").value.trim();
+  const categoria = categoriaSel === "Outro" ? document.getElementById("field-categoria-outro").value.trim() : categoriaSel;
   const data = {
-    titulo: document.getElementById("field-titulo").value.trim(),
-    cliente: document.getElementById("field-cliente").value.trim(),
-    categoria: categoriaSel === "Outro" ? document.getElementById("field-categoria-outro").value.trim() : categoriaSel,
+    titulo: [categoria, cliente].filter(Boolean).join(" - "),
+    cliente: cliente,
+    categoria: categoria,
     instituicao: instituicaoSel === "Outro" ? document.getElementById("field-instituicao-outro").value.trim() : instituicaoSel,
     etapa: document.getElementById("field-etapa").value,
     inicio: document.getElementById("field-inicio").value,
