@@ -73,20 +73,22 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .entry-deadline.is-late { color: var(--danger); }
 .entry-value { font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 
-.entregas-mini { grid-column: 1 / -1; aspect-ratio: 16 / 9; width: min(100%, 560px); margin: 12px auto 0; background: var(--surface-alt); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 18px; display: flex; flex-direction: column; justify-content: center; gap: 14px; cursor: default; }
-.mini-steps { display: flex; align-items: flex-start; width: 100%; }
-.mini-step { flex: 1; display: flex; flex-direction: column; align-items: center; position: relative; min-width: 0; }
-.mini-connector { position: absolute; top: 6px; left: -50%; width: 100%; height: 2px; background: var(--line); z-index: 0; }
-.mini-connector.done { background: var(--ink-faint); }
-.mini-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); background: var(--surface); z-index: 1; box-sizing: border-box; }
+.entregas-mini { grid-column: 1 / -1; aspect-ratio: 16 / 9; width: min(100%, 560px); margin: 12px auto 0; background: var(--surface-alt); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 18px; display: flex; flex-direction: column; gap: 10px; cursor: default; overflow: hidden; }
+.mini-steps-v { flex: 1; overflow-y: auto; padding-right: 4px; }
+.mini-step-v { display: flex; align-items: stretch; gap: 10px; }
+.mini-dot-col { display: flex; flex-direction: column; align-items: center; width: 14px; flex-shrink: 0; }
+.mini-vline { width: 2px; flex: 1; min-height: 10px; background: var(--line); margin-top: 2px; }
+.mini-vline.done { background: var(--ink-faint); }
+.mini-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); background: var(--surface); z-index: 1; box-sizing: border-box; flex-shrink: 0; }
 .mini-dot.mini-accent { border-color: var(--accent); }
 .mini-dot.mini-sage { border-color: var(--sage); }
 .mini-dot.mini-filled.mini-accent { background: var(--accent); }
 .mini-dot.mini-filled.mini-sage { background: var(--sage); }
 .mini-dot.mini-late { border-color: var(--danger); background: var(--danger-soft); }
-.mini-label { font-size: 10px; color: var(--ink-soft); margin-top: 6px; font-weight: 500; text-align: center; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; padding: 0 3px; }
-.mini-date { font-size: 10.5px; color: var(--ink-faint); margin-top: 1px; }
-.mini-legend { display: flex; gap: 16px; justify-content: center; font-size: 11px; color: var(--ink-faint); flex-wrap: wrap; }
+.mini-text { padding-bottom: 12px; min-width: 0; }
+.mini-label-v { font-size: 12px; color: var(--ink); font-weight: 500; line-height: 1.3; }
+.mini-date-v { font-size: 11px; color: var(--ink-faint); margin-top: 2px; }
+.mini-legend { display: flex; gap: 16px; justify-content: center; font-size: 11px; color: var(--ink-faint); flex-wrap: wrap; flex-shrink: 0; }
 .mini-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .mini-legend .mini-dot { border-width: 2px; }
 
@@ -605,18 +607,24 @@ function renderEntregasMini(container, entregas, clienteNome) {
     let dotClass = `mini-${cor}`;
     if (e.concluida) dotClass += " mini-filled";
     if (atrasada) dotClass = "mini-late";
-    const connectorDone = i > 0 && entregas[i - 1].concluida;
+    const connectorDone = e.concluida;
+    const isLast = i === entregas.length - 1;
     const atividade = e.descricao ? escapeHtml(e.descricao) : `Entrega ${i + 1}`;
+    const quem = e.responsavel === "cliente" ? primeiroNome : "Keithy";
     return `
-      <div class="mini-step">
-        ${i > 0 ? `<div class="mini-connector ${connectorDone ? "done" : ""}"></div>` : ""}
-        <div class="mini-dot ${dotClass}" title="${escapeHtml(e.descricao || "")}"></div>
-        <div class="mini-label" title="${escapeHtml(e.descricao || "")}">${atividade}</div>
-        <div class="mini-date">${e.data ? fmtDate(e.data) : "—"}</div>
+      <div class="mini-step-v">
+        <div class="mini-dot-col">
+          <div class="mini-dot ${dotClass}"></div>
+          ${!isLast ? `<div class="mini-vline ${connectorDone ? "done" : ""}"></div>` : ""}
+        </div>
+        <div class="mini-text">
+          <div class="mini-label-v">${atividade}</div>
+          <div class="mini-date-v">${e.data ? fmtDate(e.data) : "sem data"} · ${escapeHtml(quem)}</div>
+        </div>
       </div>`;
   }).join("");
   container.innerHTML = `
-    <div class="mini-steps">${stepsHtml}</div>
+    <div class="mini-steps-v">${stepsHtml}</div>
     <div class="mini-legend">
       <span><span class="mini-dot mini-filled mini-accent" style="width:9px;height:9px;"></span> Keithy</span>
       <span><span class="mini-dot mini-filled mini-sage" style="width:9px;height:9px;"></span> ${escapeHtml(primeiroNome)}</span>
