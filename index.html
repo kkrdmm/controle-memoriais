@@ -62,6 +62,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .tag-andamento { background: var(--sage-soft); color: var(--sage); }
 .tag-entregue { background: var(--accent-soft); color: var(--accent); }
 .tag-atrasado { background: var(--danger-soft); color: var(--danger); }
+.tag-futuro { background: var(--amber-soft); color: var(--amber); }
 
 .entry-deadline { font-size: 12.5px; color: var(--ink-faint); }
 .entry-deadline.is-urgent { color: var(--amber); }
@@ -161,6 +162,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
       <p class="subtitle" id="subtitle">carregando…</p>
     </div>
     <div class="masthead-actions">
+      <button class="btn-secondary" id="btn-new-futuro">Cliente futuro</button>
       <button class="btn-primary" id="btn-new">Novo memorial</button>
     </div>
   </header>
@@ -174,6 +176,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 
   <nav class="filters" id="filters">
     <button class="filter-tab is-active" data-filter="todos">Todos</button>
+    <button class="filter-tab" data-filter="futuro">Futuros</button>
     <button class="filter-tab" data-filter="andamento">Em andamento</button>
     <button class="filter-tab" data-filter="entregue">Entregues</button>
     <button class="filter-tab" data-filter="atrasado">Atrasados</button>
@@ -240,6 +243,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 
     <label class="field"><span>Etapa atual</span>
       <select id="field-etapa">
+        <option>Prospecção</option>
         <option>Levantamento de dados</option>
         <option>Rascunho</option>
         <option>Revisão</option>
@@ -247,6 +251,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
         <option>Entregue</option>
       </select>
     </label>
+    <p class="field-hint" id="hint-prospeccao" hidden>Cliente futuro: sem prazos ainda. Você pode voltar aqui e preencher tudo quando o trabalho começar de verdade.</p>
 
     <div class="field-row">
       <label class="field"><span>Início</span><input type="date" id="field-inicio"></label>
@@ -319,7 +324,7 @@ let currentView = "lista";
 let syncConfig = { token: "", gistId: "", ativo: false };
 let syncTimer = null;
 
-const ETAPAS = ["Levantamento de dados", "Rascunho", "Revisão", "Diagramação", "Entregue"];
+const ETAPAS = ["Prospecção", "Levantamento de dados", "Rascunho", "Revisão", "Diagramação", "Entregue"];
 function previsaoDe(m, etapa) {
   if (etapa === "Entregue") return m.prazo || "";
   if (etapa === "Rascunho") return m.prevRascunho || "";
@@ -373,7 +378,13 @@ function uid() { return Date.now().toString(36) + Math.random().toString(36).sli
 function fmtDate(iso) { if (!iso) return null; const [y, m, d] = iso.split("-"); return `${d}/${m}/${y}`; }
 function fmtMoney(v) { if (!v && v !== 0) return null; return Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); }
 function daysUntil(iso) { if (!iso) return null; const today = new Date(); today.setHours(0,0,0,0); const target = new Date(iso + "T00:00:00"); return Math.round((target - today) / 86400000); }
-function statusOf(m) { if (m.etapa === "Entregue") return "entregue"; const d = daysUntil(m.prazo); if (d !== null && d < 0) return "atrasado"; return "andamento"; }
+function statusOf(m) {
+  if (m.etapa === "Prospecção") return "futuro";
+  if (m.etapa === "Entregue") return "entregue";
+  const d = daysUntil(m.prazo);
+  if (d !== null && d < 0) return "atrasado";
+  return "andamento";
+}
 function escapeHtml(s) { const div = document.createElement("div"); div.textContent = s ?? ""; return div.innerHTML; }
 
 function showFlash(msg, kind) {
@@ -406,8 +417,10 @@ function render() {
   if (memoriais.length === 0) { subtitleEl.textContent = "nenhum memorial cadastrado ainda"; return; }
   const emAndamento = memoriais.filter((m) => statusOf(m) === "andamento").length;
   const atrasados = memoriais.filter((m) => statusOf(m) === "atrasado").length;
+  const futuros = memoriais.filter((m) => statusOf(m) === "futuro").length;
   const parts = [`${emAndamento} em andamento`];
   if (atrasados > 0) parts.push(`${atrasados} atrasado${atrasados > 1 ? "s" : ""}`);
+  if (futuros > 0) parts.push(`${futuros} futuro${futuros > 1 ? "s" : ""}`);
   subtitleEl.textContent = parts.join(", ");
 }
 
@@ -419,7 +432,7 @@ function renderLista(visible) {
     const li = document.createElement("li");
     li.className = "entry";
     li.addEventListener("click", () => openEdit(m.id));
-    const tagLabel = { andamento: "Em andamento", entregue: "Entregue", atrasado: "Atrasado" }[status];
+    const tagLabel = { andamento: "Em andamento", entregue: "Entregue", atrasado: "Atrasado", futuro: "Futuro" }[status];
     const deadlineDays = daysUntil(m.prazo);
     let deadlineText = m.prazo ? `Prazo: ${fmtDate(m.prazo)}` : "Sem prazo definido";
     let deadlineClass = "";
@@ -449,7 +462,8 @@ function renderLista(visible) {
 /* --- Cronograma: status de cada memorial conforme a previsão por etapa --- */
 function statusCronograma(m) {
   const currentIndex = ETAPAS.indexOf(m.etapa);
-  if (currentIndex === 4) return "entregue";
+  if (m.etapa === "Prospecção") return "futuro";
+  if (currentIndex === ETAPAS.length - 1) return "entregue";
   const today = new Date().toISOString().slice(0, 10);
   for (let i = currentIndex + 1; i < ETAPAS.length; i++) {
     const prev = previsaoDe(m, ETAPAS[i]);
@@ -466,8 +480,8 @@ function renderCrono(visible) {
     const currentIndex = ETAPAS.indexOf(m.etapa);
     const today = new Date().toISOString().slice(0, 10);
     const cs = statusCronograma(m);
-    const labelMap = { entregue: "Entregue", atrasado: "Atrasado", "em-dia": "Em dia", "sem-previsao": "Sem previsão" };
-    const classMap = { entregue: "tag-entregue", atrasado: "tag-atrasado", "em-dia": "tag-andamento", "sem-previsao": "tag-sem-previsao" };
+    const labelMap = { entregue: "Entregue", atrasado: "Atrasado", "em-dia": "Em dia", "sem-previsao": "Sem previsão", futuro: "Futuro" };
+    const classMap = { entregue: "tag-entregue", atrasado: "tag-atrasado", "em-dia": "tag-andamento", "sem-previsao": "tag-sem-previsao", futuro: "tag-futuro" };
 
     const row = document.createElement("div");
     row.className = "crono-row";
@@ -529,15 +543,22 @@ function syncPrevEntregueDisplay() {
 }
 document.getElementById("field-prazo").addEventListener("input", syncPrevEntregueDisplay);
 
-function openNew() {
+function toggleHintProspeccao() {
+  document.getElementById("hint-prospeccao").hidden = document.getElementById("field-etapa").value !== "Prospecção";
+}
+document.getElementById("field-etapa").addEventListener("change", toggleHintProspeccao);
+
+function openNew(etapaInicial) {
   formEl.reset();
   document.getElementById("field-id").value = "";
   document.getElementById("field-cobra-lauda").classList.remove("on");
+  document.getElementById("field-etapa").value = etapaInicial || "Levantamento de dados";
   toggleCategoriaOutro();
   toggleInstituicaoOutro();
   toggleLaudaWrap();
+  toggleHintProspeccao();
   syncPrevEntregueDisplay();
-  drawerTitleEl.textContent = "Novo memorial";
+  drawerTitleEl.textContent = etapaInicial === "Prospecção" ? "Novo cliente futuro" : "Novo memorial";
   btnDeleteEl.style.display = "none";
   overlayEl.classList.add("is-open");
   document.getElementById("field-cliente").focus();
@@ -565,6 +586,7 @@ function openEdit(id) {
   toggleCategoriaOutro();
   toggleInstituicaoOutro();
   toggleLaudaWrap();
+  toggleHintProspeccao();
   syncPrevEntregueDisplay();
   drawerTitleEl.textContent = "Editar memorial";
   btnDeleteEl.style.display = "";
@@ -613,7 +635,8 @@ btnDeleteEl.addEventListener("click", async () => {
   closeDrawer();
 });
 
-document.getElementById("btn-new").addEventListener("click", openNew);
+document.getElementById("btn-new").addEventListener("click", () => openNew());
+document.getElementById("btn-new-futuro").addEventListener("click", () => openNew("Prospecção"));
 document.getElementById("btn-close").addEventListener("click", closeDrawer);
 overlayEl.addEventListener("click", (e) => { if (e.target === overlayEl) closeDrawer(); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeDrawer(); closeSyncPanel(); } });
