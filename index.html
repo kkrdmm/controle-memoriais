@@ -34,6 +34,7 @@
   --sans: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
 .page { max-width: 1680px; margin: 0 auto; padding: 40px clamp(24px, 4vw, 64px) 96px; }
 
@@ -91,6 +92,34 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .mini-legend { display: flex; gap: 16px; justify-content: center; font-size: 11px; color: var(--ink-faint); flex-wrap: wrap; flex-shrink: 0; }
 .mini-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .mini-legend .mini-dot { border-width: 2px; }
+
+
+/* --- Financeiro --- */
+.fin-sub { font-size: 13px; font-weight: 600; color: var(--ink-soft); margin-top: 6px; }
+.fin-resumo { display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch; }
+.fin-stat { flex: 1 1 110px; background: var(--surface-alt); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; }
+.fin-stat span { display: block; font-size: 11.5px; color: var(--ink-faint); }
+.fin-stat b { display: block; font-size: 16px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.fin-stat.is-late b { color: var(--danger); }
+.fin-stat.is-ok b { color: var(--green); }
+.fin-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; border: 1px solid var(--line); background: var(--surface-alt); padding: 10px; border-radius: var(--radius); margin-top: 8px; }
+.fin-row .field { flex: 1 1 130px; }
+.fin-row .fin-obs { flex: 2 1 200px; }
+.fin-row .field-checkbox { padding-bottom: 10px; }
+#pagamentos-list:not(.is-cnpj) .nf-field { display: none; }
+.fin-remove { padding-bottom: 10px; }
+.fin-empty { font-size: 13px; color: var(--ink-faint); margin: 6px 0 0; }
+
+.fin-view { border-top: 1px solid var(--line); padding-top: 18px; }
+.fin-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.fin-grid { display: grid; grid-template-columns: 1fr; gap: 18px; }
+@media (min-width: 1000px) { .fin-grid { grid-template-columns: 1.1fr 1fr; align-items: start; } }
+.fin-list { list-style: none; margin: 0; padding: 0; }
+.fin-item { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 8px; cursor: pointer; }
+.fin-item:hover { background: var(--surface-alt); }
+.fin-item-title { font-family: var(--serif); font-size: 15.5px; font-weight: 500; }
+.fin-item-sub { font-size: 12px; color: var(--ink-faint); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.fin-item-right { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
 
 .tag-sem-previsao { background: var(--surface-alt); color: var(--ink-faint); }
 
@@ -250,6 +279,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
   <nav class="filters" id="view-tabs">
     <button class="filter-tab is-active" data-view="lista">Lista</button>
     <button class="filter-tab" data-view="cronograma">Cronograma</button>
+    <button class="filter-tab" data-view="financeiro">Financeiro</button>
   </nav>
 
   <nav class="filters" id="filters">
@@ -263,6 +293,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
   <main>
     <ul class="ledger" id="ledger"></ul>
     <div class="crono" id="crono" hidden></div>
+    <section class="fin-view" id="financeiro" hidden></section>
     <div class="empty-state" id="empty-state">
       <p>Nenhum memorial por aqui ainda.</p>
       <p class="empty-sub">Cadastre o primeiro para começar a acompanhar o andamento.</p>
@@ -383,6 +414,19 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
     </div>
 
     <p class="field-hint" id="valor-total-resumo"></p>
+
+    <div class="field-group-title">Pagamentos</div>
+    <div id="fin-section" style="display:flex;flex-direction:column;gap:10px;">
+      <div class="fin-resumo" id="fin-resumo"></div>
+
+      <div class="fin-sub">Parcelas previstas</div>
+      <div id="parcelas-list"></div>
+      <button type="button" class="btn-secondary" id="btn-add-parcela" style="align-self:flex-start;">+ Adicionar parcela</button>
+
+      <div class="fin-sub">Recebimentos</div>
+      <div id="pagamentos-list"></div>
+      <button type="button" class="btn-secondary" id="btn-add-pagamento" style="align-self:flex-start;">+ Lançar recebimento</button>
+    </div>
 
     <div class="field" style="flex-direction:row;align-items:center;gap:10px;">
       <button class="toggle" id="field-contratou-lattes" type="button"></button>
@@ -521,14 +565,21 @@ function render() {
     .filter((m) => currentFilter === "todos" || statusOf(m) === currentFilter)
     .sort((a, b) => (a.prazo || "9999-99-99").localeCompare(b.prazo || "9999-99-99"));
 
+  const finEl = document.getElementById("financeiro");
+  const isFin = currentView === "financeiro";
   ledgerEl.hidden = currentView !== "lista";
   cronoEl.hidden = currentView !== "cronograma";
-  emptyStateEl.classList.toggle("is-visible", memoriais.length === 0);
+  finEl.hidden = !isFin;
+  document.getElementById("filters").hidden = isFin;
+  document.getElementById("painel").hidden = isFin;
+  emptyStateEl.classList.toggle("is-visible", memoriais.length === 0 && !isFin);
 
-  if (currentView === "cronograma") { renderCrono(visible); }
-  else { renderLista(visible); }
-
-  renderCharts();
+  if (isFin) { renderFinanceiro(); }
+  else {
+    if (currentView === "cronograma") { renderCrono(visible); }
+    else { renderLista(visible); }
+    renderCharts();
+  }
 
   if (memoriais.length === 0) { subtitleEl.textContent = "nenhum memorial cadastrado ainda"; return; }
   const emAndamento = memoriais.filter((m) => statusOf(m) === "andamento").length;
@@ -578,6 +629,15 @@ function renderLista(visible) {
       entregasHtml = `<span class="entry-deadline ${cls}">${texto}</span>`;
       entregasChartHtml = `<div class="entregas-mini" data-mini-id="${m.id}"></div>`;
     }
+    const fin = financeiroDe(m);
+    let finTagHtml = "";
+    if (fin.status) {
+      const st = STATUS_FIN[fin.status];
+      let txt = st.label;
+      if (fin.status === "parcial") txt = `Falta ${fmtMoney(Math.max(0, fin.saldo))}`;
+      if (fin.status === "atrasado") txt = `Atrasado ${fmtMoney(fin.vencido)}`;
+      finTagHtml = `<span class="tag ${st.cls}">${txt}</span>`;
+    }
     li.innerHTML = `
       <h3 class="entry-title">${escapeHtml(m.titulo)}${m.tipoDocumento === "CNPJ" ? ` <span class="tag tag-sem-previsao" style="font-size:10.5px;vertical-align:middle;">CNPJ</span>` : ""}${m.contratouLattes ? ` <span class="tag tag-andamento" style="font-size:10.5px;vertical-align:middle;">+ Lattes</span>` : ""}</h3>
       <div class="entry-client">${escapeHtml(clienteLinha || "Sem instituição definida")}</div>
@@ -585,6 +645,7 @@ function renderLista(visible) {
         <span class="tag tag-${status}">${tagLabel}</span>
         <span class="entry-deadline ${deadlineClass}">${deadlineText}</span>
         ${entregasHtml}
+        ${finTagHtml}
         ${valorPartes.map((v) => `<span class="entry-value">${v}</span>`).join("")}
       </div>
       ${entregasChartHtml}`;
@@ -630,6 +691,193 @@ function renderEntregasMini(container, entregas, clienteNome) {
       <span><span class="mini-dot mini-filled mini-sage" style="width:9px;height:9px;"></span> ${escapeHtml(primeiroNome)}</span>
       <span><span class="mini-dot mini-late" style="width:9px;height:9px;"></span> Atrasada</span>
     </div>`;
+}
+
+
+/* --- Financeiro: parcelas previstas e recebimentos --- */
+const FORMAS_PGTO = ["Pix", "Transferência", "Dinheiro", "Cartão", "Outro"];
+const hojeISO = () => new Date().toISOString().slice(0, 10);
+
+function financeiroDe(m) {
+  const num = (v) => parseFloat(v) || 0;
+  const totalCalc = num(m.valorHora) * num(m.horasTrabalhadas) + (m.cobraLauda ? num(m.valorLauda) * num(m.qtdLaudas) : 0);
+  const parcelas = m.parcelas || [];
+  const pagamentos = m.pagamentos || [];
+  const totalParcelas = parcelas.reduce((s, p) => s + num(p.valor), 0);
+  const total = totalCalc > 0 ? totalCalc : totalParcelas;
+  const recebido = pagamentos.reduce((s, p) => s + num(p.valor), 0);
+  const hoje = hojeISO();
+  const devido = parcelas.filter((p) => p.data && p.data < hoje).reduce((s, p) => s + num(p.valor), 0);
+  const vencido = Math.max(0, devido - recebido);
+  const saldo = total - recebido;
+  let status = "";
+  if (total > 0 || recebido > 0 || parcelas.length) {
+    if (total > 0 && recebido >= total - 0.005) status = "quitado";
+    else if (vencido > 0.005) status = "atrasado";
+    else if (recebido > 0) status = "parcial";
+    else status = "pendente";
+  }
+  return { total, recebido, saldo, vencido, status };
+}
+
+const STATUS_FIN = {
+  quitado: { cls: "tag-andamento", label: "Quitado" },
+  atrasado: { cls: "tag-atrasado", label: "Pagamento em atraso" },
+  parcial: { cls: "tag-futuro", label: "Parcial" },
+  pendente: { cls: "tag-sem-previsao", label: "Nada recebido" },
+};
+
+function parcelaRowHtml(p) {
+  return `<div class="fin-row parcela-row">
+    <label class="field"><span>Vencimento</span><input type="date" class="parcela-data" value="${escapeHtml(p.data || "")}"></label>
+    <label class="field"><span>Valor (R$)</span><input type="number" class="parcela-valor" step="0.01" min="0" placeholder="0,00" value="${escapeHtml(String(p.valor ?? ""))}"></label>
+    <button type="button" class="entrega-remove fin-remove">Remover</button>
+  </div>`;
+}
+function pagamentoRowHtml(p) {
+  const opts = FORMAS_PGTO.map((f) => `<option ${p.forma === f ? "selected" : ""}>${f}</option>`).join("");
+  return `<div class="fin-row pagamento-row">
+    <label class="field"><span>Data</span><input type="date" class="pg-data" value="${escapeHtml(p.data || "")}"></label>
+    <label class="field"><span>Valor (R$)</span><input type="number" class="pg-valor" step="0.01" min="0" placeholder="0,00" value="${escapeHtml(String(p.valor ?? ""))}"></label>
+    <label class="field"><span>Forma</span><select class="pg-forma">${opts}</select></label>
+    <label class="field fin-obs"><span>Observação</span><input type="text" class="pg-obs" placeholder="Ex.: entrada, 2ª parcela..." value="${escapeHtml(p.obs || "")}"></label>
+    <label class="field-checkbox nf-field"><input type="checkbox" class="pg-nf" ${p.nf ? "checked" : ""}> NF emitida</label>
+    <button type="button" class="entrega-remove fin-remove">Remover</button>
+  </div>`;
+}
+function renderParcelas(lista) {
+  const el = document.getElementById("parcelas-list");
+  el.innerHTML = lista.length ? lista.map(parcelaRowHtml).join("") : `<p class="fin-empty">Nenhuma parcela prevista.</p>`;
+}
+function renderPagamentos(lista) {
+  const el = document.getElementById("pagamentos-list");
+  el.innerHTML = lista.length ? lista.map(pagamentoRowHtml).join("") : `<p class="fin-empty">Nenhum recebimento lançado.</p>`;
+}
+function coletarParcelasDoForm(manterVazias) {
+  const out = [...document.querySelectorAll("#parcelas-list .parcela-row")].map((r) => ({
+    data: r.querySelector(".parcela-data").value,
+    valor: r.querySelector(".parcela-valor").value,
+  }));
+  return manterVazias ? out : out.filter((p) => p.data || p.valor);
+}
+function coletarPagamentosDoForm(manterVazias) {
+  const out = [...document.querySelectorAll("#pagamentos-list .pagamento-row")].map((r) => ({
+    data: r.querySelector(".pg-data").value,
+    valor: r.querySelector(".pg-valor").value,
+    forma: r.querySelector(".pg-forma").value,
+    obs: r.querySelector(".pg-obs").value.trim(),
+    nf: r.querySelector(".pg-nf").checked,
+  }));
+  return manterVazias ? out : out.filter((p) => p.data || p.valor);
+}
+function atualizarFinanceiroForm() {
+  const el = document.getElementById("fin-resumo");
+  if (!el) return;
+  const tmp = {
+    valorHora: document.getElementById("field-valor-hora").value,
+    horasTrabalhadas: document.getElementById("field-horas-trabalhadas").value,
+    cobraLauda: document.getElementById("field-cobra-lauda").classList.contains("on"),
+    valorLauda: document.getElementById("field-valor-lauda").value,
+    qtdLaudas: document.getElementById("field-qtd-laudas").value,
+    parcelas: coletarParcelasDoForm(),
+    pagamentos: coletarPagamentosDoForm(),
+  };
+  const f = financeiroDe(tmp);
+  const st = STATUS_FIN[f.status];
+  el.innerHTML = `
+    <div class="fin-stat"><span>A receber (total)</span><b>${fmtMoney(f.total)}</b></div>
+    <div class="fin-stat is-ok"><span>Recebido</span><b>${fmtMoney(f.recebido)}</b></div>
+    <div class="fin-stat ${f.vencido > 0 ? "is-late" : ""}"><span>Saldo${f.vencido > 0 ? ` (vencido ${fmtMoney(f.vencido)})` : ""}</span><b>${fmtMoney(Math.max(0, f.saldo))}</b></div>
+    ${st ? `<div class="fin-stat"><span>Situação</span><b><span class="tag ${st.cls}">${st.label}</span></b></div>` : ""}`;
+}
+document.getElementById("btn-add-parcela").addEventListener("click", () => {
+  const atuais = coletarParcelasDoForm(true);
+  atuais.push({ data: "", valor: "" });
+  renderParcelas(atuais);
+  atualizarFinanceiroForm();
+});
+document.getElementById("btn-add-pagamento").addEventListener("click", () => {
+  const atuais = coletarPagamentosDoForm(true);
+  atuais.push({ data: hojeISO(), valor: "", forma: "Pix", obs: "", nf: false });
+  renderPagamentos(atuais);
+  atualizarFinanceiroForm();
+});
+const finSection = document.getElementById("fin-section");
+finSection.addEventListener("input", atualizarFinanceiroForm);
+finSection.addEventListener("change", atualizarFinanceiroForm);
+finSection.addEventListener("click", (e) => {
+  const btn = e.target.closest(".fin-remove");
+  if (!btn) return;
+  const row = btn.closest(".fin-row");
+  const wrap = row.parentElement;
+  row.remove();
+  if (!wrap.querySelector(".fin-row")) {
+    wrap.innerHTML = `<p class="fin-empty">${wrap.id === "parcelas-list" ? "Nenhuma parcela prevista." : "Nenhum recebimento lançado."}</p>`;
+  }
+  atualizarFinanceiroForm();
+});
+
+/* --- Aba Financeiro (visão geral de todos os clientes) --- */
+let financeiroChart = null;
+function mesLabel(ym) { const [y, m] = ym.split("-"); return `${m}/${y}`; }
+
+function renderFinanceiro() {
+  const el = document.getElementById("financeiro");
+  if (financeiroChart) { financeiroChart.destroy(); financeiroChart = null; }
+  const itens = memoriais.map((m) => ({ m, f: financeiroDe(m) })).filter((x) => x.f.status);
+  const tot = itens.reduce((a, x) => ({ total: a.total + x.f.total, recebido: a.recebido + x.f.recebido, vencido: a.vencido + x.f.vencido }), { total: 0, recebido: 0, vencido: 0 });
+  const aReceber = Math.max(0, tot.total - tot.recebido);
+
+  if (!itens.length) {
+    el.innerHTML = `<div class="empty-state is-visible"><p>Nenhum dado financeiro ainda.</p><p class="empty-sub">Informe horas/laudas, parcelas ou recebimentos na tela de cada memorial.</p></div>`;
+    return;
+  }
+
+  itens.sort((a, b) => (b.f.vencido - a.f.vencido) || (b.f.saldo - a.f.saldo));
+  const lista = itens.map(({ m, f }) => {
+    const st = STATUS_FIN[f.status];
+    const sub = `Recebido ${fmtMoney(f.recebido)} de ${fmtMoney(f.total)}`;
+    return `<li class="fin-item" data-id="${m.id}">
+      <div><div class="fin-item-title">${escapeHtml(m.titulo)}</div><div class="fin-item-sub">${sub}</div></div>
+      <div class="fin-item-right"><span class="tag ${st.cls}">${st.label}</span><span class="fin-item-sub">${f.saldo > 0.005 ? `Falta ${fmtMoney(f.saldo)}` : ""}${f.vencido > 0.005 ? ` · vencido ${fmtMoney(f.vencido)}` : ""}</span></div>
+    </li>`;
+  }).join("");
+
+  el.innerHTML = `
+    <div class="fin-cards">
+      <div class="fin-stat"><span>Total contratado</span><b>${fmtMoney(tot.total)}</b></div>
+      <div class="fin-stat is-ok"><span>Recebido</span><b>${fmtMoney(tot.recebido)}</b></div>
+      <div class="fin-stat"><span>A receber</span><b>${fmtMoney(aReceber)}</b></div>
+      <div class="fin-stat ${tot.vencido > 0 ? "is-late" : ""}"><span>Em atraso</span><b>${fmtMoney(tot.vencido)}</b></div>
+    </div>
+    <div class="fin-grid">
+      <div class="painel-card"><h3 class="painel-title">Previsto x recebido por mês</h3><div class="painel-canvas-wrap" id="fin-chart-wrap"><canvas id="chart-financeiro"></canvas></div></div>
+      <ul class="fin-list">${lista}</ul>
+    </div>`;
+
+  el.querySelectorAll(".fin-item").forEach((li) => li.addEventListener("click", () => openEdit(li.dataset.id)));
+
+  const wrap = document.getElementById("fin-chart-wrap");
+  if (typeof Chart === "undefined") { wrap.innerHTML = `<p class="painel-empty">Não foi possível carregar o gráfico (sem conexão).</p>`; return; }
+  const prev = {}, rec = {};
+  memoriais.forEach((m) => {
+    (m.parcelas || []).forEach((p) => { if (p.data && parseFloat(p.valor)) { const k = p.data.slice(0, 7); prev[k] = (prev[k] || 0) + parseFloat(p.valor); } });
+    (m.pagamentos || []).forEach((p) => { if (p.data && parseFloat(p.valor)) { const k = p.data.slice(0, 7); rec[k] = (rec[k] || 0) + parseFloat(p.valor); } });
+  });
+  const meses = [...new Set([...Object.keys(prev), ...Object.keys(rec)])].sort();
+  if (!meses.length) { wrap.innerHTML = `<p class="painel-empty">Cadastre parcelas ou recebimentos com data para ver o gráfico.</p>`; return; }
+  financeiroChart = new Chart(document.getElementById("chart-financeiro").getContext("2d"), {
+    type: "bar",
+    data: { labels: meses.map(mesLabel), datasets: [
+      { label: "Previsto", data: meses.map((k) => prev[k] || 0), backgroundColor: "#CCC3AB", borderRadius: 3 },
+      { label: "Recebido", data: meses.map((k) => rec[k] || 0), backgroundColor: "#57634A", borderRadius: 3 },
+    ] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: { y: { beginAtZero: true, ticks: { callback: (v) => "R$ " + v } } },
+      plugins: { legend: { position: "bottom", labels: { font: { size: 11 }, boxWidth: 12 } }, tooltip: { callbacks: { label: (i) => `${i.dataset.label}: ${fmtMoney(i.raw)}` } } },
+    },
+  });
 }
 
 /* --- Painel: gráficos da tela inicial --- */
@@ -772,8 +1020,10 @@ function toggleLaudaWrap() {
 function toggleEmiteNotaLabel() {
   const on = document.getElementById("field-emite-nota").classList.contains("on");
   document.getElementById("field-emite-nota-label").textContent = on ? "CNPJ (emite nota fiscal)" : "CPF (sem nota fiscal)";
+  document.getElementById("pagamentos-list").classList.toggle("is-cnpj", on);
 }
 function atualizarResumoValor() {
+  atualizarFinanceiroForm();
   const valorHora = parseFloat(document.getElementById("field-valor-hora").value) || 0;
   const horas = parseFloat(document.getElementById("field-horas-trabalhadas").value) || 0;
   const cobraLauda = document.getElementById("field-cobra-lauda").classList.contains("on");
@@ -1007,6 +1257,9 @@ function openNew(etapaInicial) {
   syncPrevEntregueDisplay();
   document.getElementById("field-qtd-entregas").value = "";
   renderEntregasFields(0);
+  renderParcelas([]);
+  renderPagamentos([]);
+  atualizarFinanceiroForm();
   renderSenhasFixas(null);
   renderSenhasOutras([]);
   drawerTitleEl.textContent = etapaInicial === "Prospecção" ? "Novo cliente futuro" : "Novo memorial";
@@ -1047,6 +1300,9 @@ function openEdit(id) {
   const entregas = m.entregas || [];
   document.getElementById("field-qtd-entregas").value = entregas.length || "";
   renderEntregasFields(entregas.length, entregas);
+  renderParcelas(m.parcelas || []);
+  renderPagamentos(m.pagamentos || []);
+  atualizarFinanceiroForm();
   renderSenhasFixas(m.senhas);
   renderSenhasOutras((m.senhas && m.senhas.outras) || []);
   drawerTitleEl.textContent = "Editar memorial";
@@ -1084,6 +1340,8 @@ formEl.addEventListener("submit", async (e) => {
     entregas: coletarEntregasDoForm(),
     contratouLattes: document.getElementById("field-contratou-lattes").classList.contains("on"),
     senhas: { ...coletarSenhasFixasDoForm(), outras: coletarSenhasOutrasDoForm() },
+    parcelas: coletarParcelasDoForm(),
+    pagamentos: coletarPagamentosDoForm(),
     obs: document.getElementById("field-obs").value.trim(),
   };
   if (id) { Object.assign(memoriais.find((x) => x.id === id), data); }
